@@ -47,6 +47,13 @@
 - `p` pause session.
 - `r` restart session.
 
+### color map
+| human | color |
+| --- | --- |
+| left seller | red |
+| right seller | green |
+| buyer | blue |
+
 ## demonstration
 The following gif demonstrates the usage.
 
