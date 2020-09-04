@@ -12,7 +12,7 @@
 
 ## code
 - `pkl_to_json.py` contains code for format conversion.
-- `format.md` contains the mapping from joint indices to body part.
+- `format.md` contains the output json format and mapping from index to body part.
 
 ## documentation
 - The documentation for the code is itself.
