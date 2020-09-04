@@ -50,3 +50,4 @@
 ## demonstration
 The following gif demonstrates the usage.
 
+![](./github/demo.gif)
