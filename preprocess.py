@@ -138,7 +138,7 @@ class DataHandler():
         panopticHeight = np.mean(np.sqrt(np.sum(panopticThigh, axis=1)))
 
         # load the rest skeleton
-        rest, names, _ = BVH.load('rest.bvh')
+        rest, names, _ = BVH.load('meta/rest.bvh')
 
         # create a mock animation for the required duration
         anim = rest.copy()
@@ -228,10 +228,10 @@ class DataHandler():
         target = np.array([[0, 0, 1]]).repeat(len(forward), axis=0)
         rotations = Quaternions.between(forward, target)[:, np.newaxis]
         positions = rotations * positions
-        velocity = rotations[1:] * positions
+        velocity = rotations[1:] * velocity
 
         # get root velocity
-        rvelocity = Pivots.from_quaternions(rotation[1:] * -rotation[:-1]).ps
+        rvelocity = Pivots.from_quaternions(rotations[1:] * -rotations[:-1]).ps
 
         # concatenate all the additional elements and reshape
         positions = positions[:-1]
@@ -318,16 +318,16 @@ class DataHandler():
 
 
 
-# motionData = pickle.load(open("170221_haggling_b1_group0.pkl", "rb"), encoding="Latin-1")
-# datahandler = DataHandler()
-#
-# datahandler.generate_rest_pose('.', '.')
-# skel = []
-# for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
-#
-#     normalizedPose = subjectInfo['joints19']
-#     anim = datahandler.retarget_skeleton(normalizedPose)
-#     skel.append(conv_debug_visual_form(datahandler.export_animation(anim)))
-#
-# vis = DataVisualizer()
-# vis.create_animation(skel, None)
+motionData = pickle.load(open("170221_haggling_b1_group0.pkl", "rb"), encoding="Latin-1")
+datahandler = DataHandler()
+
+datahandler.generate_rest_pose('meta', 'meta')
+skel = []
+for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
+
+    normalizedPose = subjectInfo['joints19']
+    anim = datahandler.retarget_skeleton(normalizedPose)
+    skel.append(conv_debug_visual_form(datahandler.export_animation(anim)))
+
+vis = DataVisualizer()
+vis.create_animation(skel, None)
