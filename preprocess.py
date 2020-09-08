@@ -200,6 +200,7 @@ class DataHandler():
 
         # select only required joints
         positions = positions[:, self.jointIdx]
+        # end function here if you want the 21 Joint representation
 
         # floor the positions
         positions = self.floor_skelton(positions)
