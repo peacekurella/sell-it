@@ -4,12 +4,12 @@ import numpy as np
 import pickle
 import scipy.ndimage.filters as filters
 
-import motion.BVH as BVH
-import motion.Animation as Animation
-from motion.Quaternions import Quaternions
-from motion.InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
-from motion.Pivots import Pivots
-from debugVisualizer import DataVisualizer
+import Motion.BVH as BVH
+import Motion.Animation as Animation
+from Motion.Quaternions import Quaternions
+from Motion.InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
+from Motion.Pivots import Pivots
+from DebugVisualizer import DebugVisualizer
 
 
 def visualize_points(positions):
@@ -34,14 +34,14 @@ def visualize_points(positions):
 
 def conv_debug_visual_form(rest_targets):  # skel: (F, J, 3)
 
-    rest_targets = rest_targets.reshape(rest_targets.shape[0],
-                                        rest_targets.shape[1] * rest_targets.shape[2])  # (F, 3J)
+    rest_targets = rest_targets.reshape(rest_targets.shape[0], -1)  # (F, 3J)
     rest_targets = np.swapaxes(rest_targets, 0, 1)  # (3J, F)
 
     return rest_targets
 
 
-class DataHandler():
+class SkeletonHandler:
+    """ Class for Handling Skeleton Data """
 
     def __init__(self):
 
@@ -188,19 +188,12 @@ class DataHandler():
 
         return anim
 
-    def export_animation(self, anim):
+    def export_animation(self, positions):
         """
         Converts animations into Learning format
-        :param anim: animation to be exported
+        :param positions: animation to be exported
         :return:
         """
-
-        # do FK and get global positons
-        positions = Animation.positions_global(anim)
-
-        # select only required joints
-        positions = positions[:, self.jointIdx]
-        # end function here if you want the 21 Joint representation
 
         # floor the positions
         positions = self.floor_skelton(positions)
@@ -208,6 +201,7 @@ class DataHandler():
         # get root projection
         r_pjx = self.project_root(positions)
         positions = np.concatenate([r_pjx, positions], axis=1)
+        trans = positions[0, 0:1, :].copy()
 
         # get foot contacts
         feet_l, feet_r = self.generate_foot_contacts(positions)
@@ -222,7 +216,7 @@ class DataHandler():
         positions[:, :, 2] = positions[:, :, 2] - trans_z
 
         # get forward direction
-        forward = self.get_forward(positions)
+        forward = self.get_body_normal(positions)
 
         # rotate by Y axis to make sure skeleton faces the forward direction
         target = np.array([[0, 0, 1]]).repeat(len(forward), axis=0)
@@ -241,7 +235,7 @@ class DataHandler():
         positions = np.concatenate([positions, rvelocity], axis=-1)
         positions = np.concatenate([positions, feet_l, feet_r], axis=-1)
 
-        return positions
+        return positions, -rotations[0], trans
 
 
     def floor_skelton(self, skeleton):
@@ -296,11 +290,11 @@ class DataHandler():
 
         return feet_l, feet_r
 
-    def get_forward(self, positions):
+    def get_body_normal(self, positions):
         """
         Returns the forward direction of the skeleton
         :param positions: Global position tensor (F, J+1, 3)
-        :return: forward direction
+        :return: Body normals paralell to x-z plane
         """
 
         sdr_l, sdr_r, hip_l, hip_r = 14, 18, 2, 6
@@ -316,18 +310,83 @@ class DataHandler():
 
         return forward
 
+    def recover_global_positions(self, processed, initRot, initTrans):
+        """
+        Rescovers the original global positions given the Holden form
+        :param processed: Holden data format gestures (F, 73)
+        :param initRot: intial rotation of the skeleton
+        :param initTrans: initial translation of the skeleton
+        :return:
+        """
 
+        # split into joints and root velocities
+        joints = processed[:, :-7]
+        root_x, root_z, root_r = processed[:, -7], processed[:, -6], processed[:, -5]
 
+        # filter out high frequency movements
+        # root_x = filters.gaussian_filter1d(root_x, 3, axis=0, mode='nearest')
+        # root_z = filters.gaussian_filter1d(root_z, 3, axis=0, mode='nearest')
+        # root_r = filters.gaussian_filter1d(root_r, 3, axis=0, mode='nearest')
+
+        # reshape into the right format
+        joints = joints.reshape(len(joints), -1, 3)
+
+        # set initial rotation and translation
+        if initRot is None:
+            rotation = Quaternions.id(1)
+        else:
+            rotation = initRot
+
+        if initTrans is None:
+            translation = np.array([[0, 0, 0]])
+        else:
+            translation = initTrans
+
+        # maintain a list of the offsets
+        offsets = []
+
+        # integrate over time to recover original values
+        for i in range(len(joints)):
+            joints[i, :, :] = rotation * joints[i]
+            joints[i, :, 0] = joints[i, :, 0] + translation[0, 0]
+            joints[i, :, 2] = joints[i, :, 2] + translation[0, 2]
+            rotation = Quaternions.from_angle_axis(-root_r[i], np.array([0, 1, 0])) * rotation
+            offsets.append(rotation * np.array([0, 0, 1]))
+            translation = translation + rotation * np.array([root_x[i], 0, root_z[i]])
+
+        joints = self.floor_skelton(joints[:, 1:])
+
+        return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
+
+# read in the pkl file
 motionData = pickle.load(open("170221_haggling_b1_group0.pkl", "rb"), encoding="Latin-1")
-datahandler = DataHandler()
+datahandler = SkeletonHandler()
 
+# The meta directory contains the rest poses
 datahandler.generate_rest_pose('meta', 'meta')
 skel = []
+
+# Read the pkl file
 for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
 
+    # read in the pose data from pkl file
     normalizedPose = subjectInfo['joints19']
-    anim = datahandler.retarget_skeleton(normalizedPose)
-    skel.append(conv_debug_visual_form(datahandler.export_animation(anim)))
 
-vis = DataVisualizer()
+    # retarget onto CMU skeleton
+    anim = datahandler.retarget_skeleton(normalizedPose)
+
+    # Do FK recover 3D joint positions, select required Joints only
+    positions = Animation.positions_global(anim)
+    positions = positions[:, datahandler.jointIdx]
+
+    # convert to the Holden form and return initial rotation
+    # and translation
+    h_form, initRot, initTrans = datahandler.export_animation(positions)
+
+    # recover the 3D joint positions from holden's format
+    joints = datahandler.recover_global_positions(h_form, initRot, initTrans)
+    skel.append(conv_debug_visual_form(joints))
+
+# visualize the recovered data to make sure it's bug free
+vis = DebugVisualizer()
 vis.create_animation(skel, None)

@@ -4,14 +4,14 @@ import mpl_toolkits.mplot3d.axes3d as p3
 import matplotlib.animation as anim
 
 
-class DataVisualizer:
+class DebugVisualizer:
     """
     visualizes the data
     """
 
     def __init__(self):
         """
-        Initializes the DataVisualizer
+        Initializes the DebugVisualizer
         """
 
         # create the list of connections in the human body

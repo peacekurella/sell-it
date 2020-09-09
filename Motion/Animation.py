@@ -3,8 +3,8 @@ import operator
 import numpy as np
 import numpy.core.umath_tests as ut
 
-import AnimationStructure
-from Quaternions import Quaternions
+import Motion.AnimationStructure as AnimationStructure
+from Motion.Quaternions import Quaternions
 
 class Animation:
     """
@@ -127,7 +127,7 @@ class Animation:
             self.offsets.ravel()])
         
     @classmethod
-    def unravel(clas, anim, shape, parents):
+    def unravel(cls, anim, shape, parents):
         nf, nj = shape
         rotations = anim[nf*nj*0:nf*nj*3]
         positions = anim[nf*nj*3:nf*nj*6]

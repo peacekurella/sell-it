@@ -1,8 +1,8 @@
 import re
 import numpy as np
 
-from Animation import Animation
-from Quaternions import Quaternions
+from Motion.Animation import Animation
+from Motion.Quaternions import Quaternions
 
 channelmap = {
     'Xrotation' : 'x',
@@ -225,9 +225,9 @@ def save(filename, anim, names=None, frametime=1.0/24.0, order='zyx', positions=
         f.write("Frame Time: %f\n" % frametime);
             
         #if orients:        
-        #    rots = np.degrees((-anim.orients[np.newaxis] * anim.rotations).euler(order=order[::-1]))
+        #    rots = np.degrees((-positions.orients[np.newaxis] * positions.rotations).euler(order=order[::-1]))
         #else:
-        #    rots = np.degrees(anim.rotations.euler(order=order[::-1]))
+        #    rots = np.degrees(positions.rotations.euler(order=order[::-1]))
         rots = np.degrees(anim.rotations.euler(order=order[::-1]))
         poss = anim.positions
         
