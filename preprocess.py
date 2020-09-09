@@ -323,11 +323,6 @@ class SkeletonHandler:
         joints = processed[:, :-7]
         root_x, root_z, root_r = processed[:, -7], processed[:, -6], processed[:, -5]
 
-        # filter out high frequency movements
-        # root_x = filters.gaussian_filter1d(root_x, 3, axis=0, mode='nearest')
-        # root_z = filters.gaussian_filter1d(root_z, 3, axis=0, mode='nearest')
-        # root_r = filters.gaussian_filter1d(root_r, 3, axis=0, mode='nearest')
-
         # reshape into the right format
         joints = joints.reshape(len(joints), -1, 3)
 
