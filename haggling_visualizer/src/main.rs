@@ -2,27 +2,23 @@ use amethyst::{
     assets::{PrefabLoader, PrefabLoaderSystemDesc, RonFormat},
     controls::{FlyControlBundle, HideCursor},
     core::math::{Point3, Vector3},
-    core::transform::TransformBundle,
     ecs::{Entity, WorldExt},
-    input::{is_key_down, is_mouse_button_down, InputBundle, StringBindings},
+    input::{is_key_down, is_mouse_button_down, StringBindings, VirtualKeyCode},
     prelude::*,
+    renderer::debug_drawing::{DebugLines, DebugLinesComponent},
     renderer::{
-        debug_drawing::{DebugLines, DebugLinesComponent},
         palette::Srgba,
-    },
-    renderer::{
-        plugins::RenderShaded3D,
-        plugins::{RenderDebugLines, RenderToWindow},
         rendy::mesh::{Normal, Position, TexCoord},
         types::DefaultBackend,
-        RenderingBundle,
     },
-    ui::{Anchor, RenderUi, UiBundle, UiButtonBuilder, UiImage, UiText},
+    ui::UiGlyphsSystemDesc,
+    ui::{Anchor, UiButtonBuilder, UiImage, UiText},
     utils::fps_counter::{FpsCounter, FpsCounterBundle},
-    utils::{application_root_dir, scene::BasicScenePrefab},
-    winit::{MouseButton, VirtualKeyCode},
+    utils::scene::BasicScenePrefab,
+    winit::MouseButton,
     Error,
 };
+use amethyst_precompile::{start_game, PrecompiledDefaultsBundle, PrecompiledRenderBundle};
 
 mod haggling_session;
 
@@ -204,7 +200,6 @@ impl SimpleState for OnlyState {
             render_state.frame,
             render_state.session.subjects()[0].num_frames() - 1
         );
-
         Trans::None
     }
 }
@@ -220,11 +215,6 @@ fn main() -> Result<(), Error> {
 
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir()?;
-    let assets_dir = app_root.join("assets");
-    let display_config_path = app_root.join("config/display.ron");
-    let key_bindings_path = app_root.join("config/input.ron");
-
     let game_data = GameDataBuilder::default()
         .with_system_desc(PrefabLoaderSystemDesc::<MyPrefabData>::default(), "", &[])
         .with_bundle(
@@ -236,24 +226,18 @@ fn main() -> Result<(), Error> {
             .with_sensitivity(0.1, 0.1)
             .with_speed(4.0),
         )?
-        .with_bundle(TransformBundle::new().with_dep(&["fly_movement"]))?
-        .with_bundle(
-            InputBundle::<StringBindings>::new().with_bindings_from_file(&key_bindings_path)?,
-        )?
-        .with_bundle(UiBundle::<StringBindings>::new())?
         .with_bundle(FpsCounterBundle::default())?
-        .with_bundle(
-            RenderingBundle::<DefaultBackend>::new()
-                .with_plugin(
-                    RenderToWindow::from_config_path(display_config_path)?
-                        .with_clear([0.0, 0.0, 0.0, 1.0]),
-                )
-                .with_plugin(RenderShaded3D::default())
-                .with_plugin(RenderDebugLines::default())
-                .with_plugin(RenderUi::default()),
-        )?;
+        .with_system_desc(
+            UiGlyphsSystemDesc::<DefaultBackend>::default(),
+            "ui_glyph_system",
+            &[],
+        )
+        .with_bundle(PrecompiledDefaultsBundle {
+            key_bindings_path: &"config/input.ron",
+            display_config_path: &"config/display.ron",
+        })?
+        .with_bundle(PrecompiledRenderBundle)?;
 
-    let mut game = Application::new(assets_dir, OnlyState, game_data)?;
-    game.run();
+    start_game(&"assets", game_data, Some(Box::new(OnlyState)));
     Ok(())
 }
