@@ -11,34 +11,6 @@ from Pivots import Pivots
 from DebugVisualizer import DebugVisualizer
 
 
-def visualize_points(positions):
-    """
-    Debug function for visualizing the rest skeleton
-    :param positions: (F, J, 3) numpy array
-    :return:
-    """
-    import matplotlib.pyplot as plt
-    ax = plt.axes(projection='3d')
-
-    points = positions[0]
-    for i in range(points.shape[0]):
-        ax.scatter(points[i][0], points[i][1], points[i][2])
-        ax.text(points[i][0], points[i][1], points[i][2], str(i))
-
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.show()
-
-
-def conv_debug_visual_form(rest_targets):  # skel: (F, J, 3)
-
-    rest_targets = rest_targets.reshape(rest_targets.shape[0], -1)  # (F, 3J)
-    rest_targets = np.swapaxes(rest_targets, 0, 1)  # (3J, F)
-
-    return rest_targets
-
-
 class SkeletonHandler:
     """ Class for Handling Skeleton Data """
 
@@ -355,6 +327,7 @@ class SkeletonHandler:
 # read in the pkl file
 motionData = pickle.load(open("170221_haggling_b1_group0.pkl", "rb"), encoding="Latin-1")
 datahandler = SkeletonHandler()
+vis = DebugVisualizer()
 
 # The meta directory contains the rest poses
 datahandler.generate_rest_pose('meta', 'meta')
@@ -379,8 +352,7 @@ for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (
 
     # recover the 3D joint positions from holden's format
     joints = datahandler.recover_global_positions(h_form, initRot, initTrans)
-    skel.append(conv_debug_visual_form(joints))
+    skel.append(vis.conv_debug_visual_form(joints))
 
 # visualize the recovered data to make sure it's bug free
-vis = DebugVisualizer()
 vis.create_animation(skel, None)

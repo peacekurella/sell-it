@@ -23,20 +23,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="110540f9-5bd7-4477-be07-7cc1ca74d9ab" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/sell-it.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/sell-it.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/motion/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/AStar.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/AStar.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/Animation.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/Animation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/AnimationPositions.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/AnimationPositions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/AnimationStructure.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/AnimationStructure.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/BVH.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/BVH.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/InverseKinematics.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/InverseKinematics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/Pivots.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/Pivots.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/Quaternions.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/Quaternions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/TimeWarp.py" beforeDir="false" afterPath="$PROJECT_DIR$/motion/TimeWarp.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Motion/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DebugVisualizer.py" beforeDir="false" afterPath="$PROJECT_DIR$/DebugVisualizer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/preprocess.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -77,8 +66,9 @@
     <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="ignore_missing_gitignore" value="true" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyIntegratedToolsModulesConfigurable" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -127,6 +117,14 @@
       <option name="presentableId" value="Default" />
       <updated>1599351471427</updated>
     </task>
+    <task id="LOCAL-00001" summary="Quality of Life changes">
+      <created>1599966919475</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1599966919475</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -139,6 +137,11 @@
         </entry>
       </map>
     </option>
+    <option name="oldMeFiltersMigrated" value="true" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Quality of Life changes" />
+    <option name="LAST_COMMIT_MESSAGE" value="Quality of Life changes" />
   </component>
   <component name="WindowStateProjectService">
     <state x="447" y="129" width="1092" height="849" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1599965809614">
@@ -149,6 +152,10 @@
       <screen x="67" y="34" width="1853" height="1046" />
     </state>
     <state x="625" y="323" width="717" height="431" key="#com.intellij.fileTypes.FileTypeChooser/1920.0.1920.1080/67.34.1853.1046@67.34.1853.1046" timestamp="1599352378612" />
+    <state x="440" y="33" width="1096" height="1011" key="CommitChangelistDialog2" timestamp="1599966919371">
+      <screen x="67" y="34" width="1853" height="1046" />
+    </state>
+    <state x="440" y="33" width="1096" height="1011" key="CommitChangelistDialog2/1920.0.1920.1080/67.34.1853.1046@67.34.1853.1046" timestamp="1599966919371" />
     <state x="691" y="222" width="606" height="633" key="FileChooserDialogImpl" timestamp="1599965563690">
       <screen x="67" y="34" width="1853" height="1046" />
     </state>
@@ -189,10 +196,14 @@
       <screen x="67" y="34" width="1853" height="1046" />
     </state>
     <state width="1825" height="339" key="GridCell.Tab.1.right/1920.0.1920.1080/67.34.1853.1046@67.34.1853.1046" timestamp="1599501280859" />
-    <state x="358" y="86" key="SettingsEditor" timestamp="1599966672415">
+    <state x="358" y="86" key="SettingsEditor" timestamp="1599968257316">
       <screen x="67" y="34" width="1853" height="1046" />
     </state>
-    <state x="358" y="86" key="SettingsEditor/1920.0.1920.1080/67.34.1853.1046@67.34.1853.1046" timestamp="1599966672415" />
+    <state x="358" y="86" key="SettingsEditor/1920.0.1920.1080/67.34.1853.1046@67.34.1853.1046" timestamp="1599968257316" />
+    <state x="488" y="212" width="1000" height="654" key="Vcs.Push.Dialog.v2" timestamp="1599967238933">
+      <screen x="67" y="34" width="1853" height="1046" />
+    </state>
+    <state x="488" y="212" width="1000" height="654" key="Vcs.Push.Dialog.v2/1920.0.1920.1080/67.34.1853.1046@67.34.1853.1046" timestamp="1599967238933" />
     <state x="572" y="45" width="840" height="1034" key="search.everywhere.popup" timestamp="1599537181028">
       <screen x="67" y="34" width="1853" height="1046" />
     </state>
