@@ -1,6 +1,5 @@
 import numpy as np
-import scipy.sparse as sparse
-import Motion.Animation as Animation
+import Animation as Animation
 
 
 """ Maya Functions """

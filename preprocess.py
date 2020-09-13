@@ -1,14 +1,13 @@
-import sys
 import os
 import numpy as np
 import pickle
 import scipy.ndimage.filters as filters
 
-import Motion.BVH as BVH
-import Motion.Animation as Animation
-from Motion.Quaternions import Quaternions
-from Motion.InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
-from Motion.Pivots import Pivots
+import BVH as BVH
+import Animation as Animation
+from Quaternions import Quaternions
+from InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
+from Pivots import Pivots
 from DebugVisualizer import DebugVisualizer
 
 
@@ -365,18 +364,18 @@ skel = []
 for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
 
     # read in the pose data from pkl file
-    normalizedPose = subjectInfo['joints19']
+    normalizedPose = subjectInfo['joints19'] #(F, 57)
 
     # retarget onto CMU skeleton
     anim = datahandler.retarget_skeleton(normalizedPose)
 
     # Do FK recover 3D joint positions, select required Joints only
     positions = Animation.positions_global(anim)
-    positions = positions[:, datahandler.jointIdx]
+    positions = positions[:, datahandler.jointIdx] #(F, 21, 3)
 
     # convert to the Holden form and return initial rotation
     # and translation
-    h_form, initRot, initTrans = datahandler.export_animation(positions)
+    h_form, initRot, initTrans = datahandler.export_animation(positions) #(F, 73)
 
     # recover the 3D joint positions from holden's format
     joints = datahandler.recover_global_positions(h_form, initRot, initTrans)
