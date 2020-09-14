@@ -238,6 +238,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "amethyst_precompile"
+version = "0.1.0"
+dependencies = [
+ "amethyst",
+]
+
+[[package]]
 name = "amethyst_rendy"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1346,6 +1353,7 @@ name = "haggling_visualizer"
 version = "0.1.0"
 dependencies = [
  "amethyst",
+ "amethyst_precompile",
  "serde",
  "serde_json",
 ]

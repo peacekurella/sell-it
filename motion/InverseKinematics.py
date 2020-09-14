@@ -1,10 +1,10 @@
 import numpy as np
 import scipy.linalg as linalg
 
-import Motion.Animation as Animation
-import Motion.AnimationStructure as AnimationStructure
+import Animation as Animation
+import AnimationStructure as AnimationStructure
 
-from Motion.Quaternions import Quaternions
+from Quaternions import Quaternions
 
 class BasicInverseKinematics:
     """
