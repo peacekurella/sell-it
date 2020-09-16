@@ -1,43 +1,14 @@
-import sys
 import os
 import numpy as np
 import pickle
 import scipy.ndimage.filters as filters
 
-import Motion.BVH as BVH
-import Motion.Animation as Animation
-from Motion.Quaternions import Quaternions
-from Motion.InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
-from Motion.Pivots import Pivots
+import BVH as BVH
+import Animation as Animation
+from Quaternions import Quaternions
+from InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
+from Pivots import Pivots
 from DebugVisualizer import DebugVisualizer
-
-
-def visualize_points(positions):
-    """
-    Debug function for visualizing the rest skeleton
-    :param positions: (F, J, 3) numpy array
-    :return:
-    """
-    import matplotlib.pyplot as plt
-    ax = plt.axes(projection='3d')
-
-    points = positions[0]
-    for i in range(points.shape[0]):
-        ax.scatter(points[i][0], points[i][1], points[i][2])
-        ax.text(points[i][0], points[i][1], points[i][2], str(i))
-
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.show()
-
-
-def conv_debug_visual_form(rest_targets):  # skel: (F, J, 3)
-
-    rest_targets = rest_targets.reshape(rest_targets.shape[0], -1)  # (F, 3J)
-    rest_targets = np.swapaxes(rest_targets, 0, 1)  # (3J, F)
-
-    return rest_targets
 
 
 class SkeletonHandler:
@@ -356,6 +327,7 @@ class SkeletonHandler:
 # read in the pkl file
 motionData = pickle.load(open("170221_haggling_b1_group0.pkl", "rb"), encoding="Latin-1")
 datahandler = SkeletonHandler()
+vis = DebugVisualizer()
 
 # The meta directory contains the rest poses
 datahandler.generate_rest_pose('meta', 'meta')
@@ -365,23 +337,22 @@ skel = []
 for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
 
     # read in the pose data from pkl file
-    normalizedPose = subjectInfo['joints19']
+    normalizedPose = subjectInfo['joints19'] #(F, 57)
 
     # retarget onto CMU skeleton
     anim = datahandler.retarget_skeleton(normalizedPose)
 
     # Do FK recover 3D joint positions, select required Joints only
     positions = Animation.positions_global(anim)
-    positions = positions[:, datahandler.jointIdx]
+    positions = positions[:, datahandler.jointIdx] #(F, 21, 3)
 
     # convert to the Holden form and return initial rotation
     # and translation
-    h_form, initRot, initTrans = datahandler.export_animation(positions)
+    h_form, initRot, initTrans = datahandler.export_animation(positions) #(F, 73)
 
     # recover the 3D joint positions from holden's format
     joints = datahandler.recover_global_positions(h_form, initRot, initTrans)
-    skel.append(conv_debug_visual_form(joints))
+    skel.append(vis.conv_debug_visual_form(joints))
 
 # visualize the recovered data to make sure it's bug free
-vis = DebugVisualizer()
 vis.create_animation(skel, None)

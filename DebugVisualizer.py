@@ -1,8 +1,8 @@
 import matplotlib
+import matplotlib.animation as anim
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
-import matplotlib.animation as anim
-
+import numpy as np
 
 class DebugVisualizer:
     """
@@ -50,7 +50,7 @@ class DebugVisualizer:
         self.fig.set_size_inches(19.20, 10.80, True)
         self.ax = p3.Axes3D(self.fig)
         self.ax.view_init(elev=60)
-        #self.ax._axis3don = False
+        # self.ax._axis3don = False
         self.ax.set_xlim3d(-200, 200)
         self.ax.set_ylim3d(0, 200)
         self.ax.set_zlim3d(-200, 200)
@@ -170,3 +170,32 @@ class DebugVisualizer:
             plt.show(self.fig)
 
         plt.close(self.fig)
+
+    def visualize_points(self, positions):
+        """
+        Debug function for visualizing the rest skeleton
+        :param positions: (F, J, 3) numpy array
+        :return:
+        """
+        ax = plt.axes(projection='3d')
+
+        points = positions[0]
+        for i in range(points.shape[0]):
+            ax.scatter(points[i][0], points[i][1], points[i][2])
+            ax.text(points[i][0], points[i][1], points[i][2], str(i))
+
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.show()
+
+    def conv_debug_visual_form(self, rest_targets):
+        """
+        Function for converting the input into the required format
+        :param rest_targets: Input skeleton (F, J, 3)
+        :return: rest_targets (3J, F)
+        """
+        rest_targets = rest_targets.reshape(rest_targets.shape[0], -1)  # (F, 3J)
+        rest_targets = np.swapaxes(rest_targets, 0, 1)  # (3J, F)
+
+        return rest_targets
