@@ -1,0 +1,12 @@
+# folder containing output and input data
+Data/
+HagglingData/
+
+# ide related files
+.idea/*
+.idea/other.xml
+.idea/workspace.xml
+.idea/sell-it.iml
+__pycache__/
+venv/
+
