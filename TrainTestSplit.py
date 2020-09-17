@@ -3,7 +3,7 @@ import os
 import json
 import pickle
 import numpy as np
-import Motion.Animation as Animation
+import motion.Animation as Animation
 from preprocess import SkeletonHandler
 
 if __name__ == '__main__':
@@ -36,14 +36,15 @@ if __name__ == '__main__':
         motionData = pickle.load(r, encoding="Latin-1")
         datahandler = SkeletonHandler()
         # The meta directory contains the rest poses
-        datahandler.generate_rest_pose('meta', 'meta')
+        # datahandler.generate_rest_pose('meta', 'meta')
         skel = []
         data_dict = {"winner_id": motionData['winnerId'], "subjects": {}}
         numFrames = motionData['subjects'][0]['joints19'].shape[1]
-        numWindows = int(numFrames / window_size)
-        padding_length = window_size - (numFrames % window_size)
-        if padding_length > 0:
-            numWindows += 1
+        padding_length = 0
+        num_windows = int(numFrames / step_size)
+        if numFrames % step_size != 0:
+            padding_length = step_size - (numFrames % step_size)
+            num_windows += 1
 
         bid = motionData['buyerId']
         lid = motionData['leftSellerId']
@@ -52,6 +53,13 @@ if __name__ == '__main__':
 
         # Read the pkl file
         for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
+
+            # get humanId
+            humanId = subjectInfo['humanId']
+
+            # get bodyNormal and faceNormal Info
+            bodyNormal = subjectInfo['bodyNormal'][1:]
+            faceNormal = subjectInfo['faceNormal'][1:]
 
             # read in the pose data from pkl file
             normalizedPose = subjectInfo['joints19']
@@ -63,55 +71,69 @@ if __name__ == '__main__':
             positions = Animation.positions_global(anim)
             positions = positions[:, datahandler.jointIdx]
 
-            # convert to the Holden form and return initial rotation
-            # and translation
-            h_form, initRot, initTrans = datahandler.export_animation(positions)
+            sub[humanId] = [positions, bodyNormal, faceNormal]
 
-            # convert rotation quaternion to euler form list
-            initRotEuler = initRot.euler().tolist()
-            initTrans = initTrans.tolist()
-
-            # get bodyNormal and faceNormal Info
-            bodyNormal = subjectInfo['bodyNormal'][1:]
-            faceNormal = subjectInfo['faceNormal'][1:]
-
-            # padding data if required
-            if padding_length > 0:
-                h_form = np.pad(h_form, ((padding_length, 0), (0, 0)))
-                bodyNormal = np.pad(bodyNormal, ((0, 0), (padding_length, 0)))
-                faceNormal = np.pad(faceNormal, ((0, 0), (padding_length, 0)))
-
-            # get humanId
-            humanId = subjectInfo['humanId']
-            sub[humanId] = [h_form, bodyNormal, faceNormal, initTrans, initRotEuler]
-
-        subjects = {'buyer': {"human_Id": bid, "initRot": sub[bid][-1],
-                              "initTrans": sub[bid][-2], "frames": [{}]},
-                    'leftSeller': {"human_Id": lid, "initRot": sub[lid][-1],
-                                   "initTrans": sub[lid][-2], "frames": [{}]},
-                    "rightSeller": {"human_Id": rid, "initRot": sub[rid][-1],
-                                    "initTrans": sub[rid][-2], "frames": [{}]}}
+        subjects = {'buyer': {"human_Id": bid, "initRot": [],
+                              "initTrans": [], "frames": [{}]},
+                    'leftSeller': {"human_Id": lid, "initRot": [],
+                                   "initTrans": [], "frames": [{}]},
+                    "rightSeller": {"human_Id": rid, "initRot": [],
+                                    "initTrans": [], "frames": [{}]}}
 
         name = file.split('.')[0]
         file_char = name.split('_')
+        # to check if file should be in test or train folder
         file_group_name = '_'.join(file_char[0:-1])
         start_index = 0
-        for num in range(numWindows):
+        # if padding, then end_index needs to be adjusted
+        if padding_length > 0:
+            end_index = start_index + window_size - padding_length
+        else:
             end_index = start_index + window_size
-            buyer = {"joints21": sub[bid][0][start_index:end_index, :].tolist(),
-                     "body_normal": sub[bid][1][:, start_index:end_index].tolist(),
-                     "face_normal": sub[bid][2][:, start_index:end_index].tolist()}
-            subjects["buyer"]["frames"] = [buyer]
-            leftSeller = {"joints21": sub[lid][0][start_index:end_index, :].tolist(),
-                          "body_normal": sub[lid][1][:, start_index:end_index].tolist(),
-                          "face_normal": sub[lid][2][:, start_index:end_index].tolist()}
-            subjects["leftSeller"]["frames"] = [leftSeller]
-            rightSeller = {"joints21": sub[rid][0][start_index:end_index, :].tolist(),
-                           "body_normal": sub[rid][1][:, start_index:end_index].tolist(),
-                           "face_normal": sub[rid][2][:, start_index:end_index].tolist()}
-            subjects["rightSeller"]["frames"] = [rightSeller]
-            data_dict["subjects"] = subjects
-            file_name = name + '_' + str(num) + '.json'
+        window_num = 0
+        while end_index <= numFrames:
+            for key in sub.keys():
+                positions = sub[bid][0][start_index:end_index, :, :]
+                h_form, initRot, initTrans = datahandler.export_animation(positions)
+                bodyNormal = sub[key][1][:, start_index:end_index]
+                faceNormal = sub[key][2][:, start_index:end_index]
+                # padding the arrays
+                if start_index < padding_length:
+                    h_form = np.pad(h_form, ((padding_length, 0), (0, 0)))
+                    bodyNormal = np.pad(bodyNormal, ((0, 0), (padding_length, 0)))
+                    faceNormal = np.pad(faceNormal, ((0, 0), (padding_length, 0)))
+                # convert rotation quaternion to euler form list, also convert all np arrays to list
+                initRotEuler = initRot.euler().tolist()
+                initTrans = initTrans.tolist()
+                h_form = h_form.tolist()
+                bodyNormal = bodyNormal.tolist()
+                faceNormal = faceNormal.tolist()
+                # save to the appropriate dictionary
+                if key == bid:
+                    buyer = {"joints21": h_form,
+                             "body_normal": bodyNormal,
+                             "face_normal": faceNormal}
+                    subjects["buyer"]["frames"] = [buyer]
+                    subjects["buyer"]["initRot"] = initRotEuler
+                    subjects["buyer"]["initTrans"] = initTrans
+                elif key == lid:
+                    leftSeller = {"joints21": h_form,
+                                  "body_normal": bodyNormal,
+                                  "face_normal": faceNormal}
+                    subjects["leftSeller"]["frames"] = [leftSeller]
+                    subjects["leftSeller"]["initRot"] = initRotEuler
+                    subjects["leftSeller"]["initTrans"] = initTrans
+                else:
+                    rightSeller = {"joints21": h_form,
+                                   "body_normal": bodyNormal,
+                                   "face_normal": faceNormal}
+                    subjects["rightSeller"]["frames"] = [rightSeller]
+                    subjects["rightSeller"]["initRot"] = initRotEuler
+                    subjects["rightSeller"]["initTrans"] = initTrans
+
+            data_dict["subjects"] = [subjects]
+            file_name = name + '_' + str(window_num) + '.json'
+            # save the file to the destined folder
             if file_group_name not in test_list:
                 x = open(train_folder + file_name, 'w')
                 with x as outfile:
@@ -120,4 +142,13 @@ if __name__ == '__main__':
                 x = open(test_folder + file_name, 'w')
                 with x as outfile:
                     json.dump(data_dict, outfile, sort_keys=False, indent=2)
-            start_index += step_size
+
+            # if padding, start_index of next window needs to be adjusted to maintain proper overlap
+            if start_index < padding_length:
+                start_index += step_size - padding_length
+                padding_length = 0
+            else:
+                start_index += step_size
+
+            end_index = start_index + window_size
+            window_num += 1
