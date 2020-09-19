@@ -25,7 +25,7 @@ if __name__ == '__main__':
     os.makedirs(train_folder, exist_ok=True)
     os.makedirs(test_folder, exist_ok=True)
 
-    f = open("testing_files.json")
+    f = open("meta/testing_files.json")
     test_list_file = json.load(f)
     test_list = test_list_file["file_names"]
 
