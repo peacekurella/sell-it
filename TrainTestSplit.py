@@ -3,7 +3,7 @@ import os
 import json
 import pickle
 import numpy as np
-import motion.Animation as Animation
+import Animation as Animation
 from preprocess import SkeletonHandler
 
 if __name__ == '__main__':

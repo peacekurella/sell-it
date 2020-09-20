@@ -1,15 +1,16 @@
 import os
 import numpy as np
 import pickle
-import scipy.ndimage.filters as filters
+import scipy.ndimage.filters as filter
+import json
 from absl import app
 from absl import flags
 
-import motion.BVH as BVH
-import motion.Animation as Animation
-from motion.Quaternions import Quaternions
-from motion.InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
-from motion.Pivots import Pivots
+import BVH as BVH
+import Animation as Animation
+from Quaternions import Quaternions
+from InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
+from Pivots import Pivots
 from DebugVisualizer import DebugVisualizer
 
 
@@ -333,9 +334,6 @@ class SkeletonHandler:
         return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
 
 def main(argv):
-  if FLAGS.debug:
-    print('non-flag arguments:', argv)
-
   print('flag arguments')
   print('source folder', FLAGS.source)
   print('output folder', FLAGS.output)
