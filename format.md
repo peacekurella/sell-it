@@ -1,59 +1,54 @@
-# json format
+#JSON format
 ```json
 {
     "winner_id": u8,
-    "subjects": [
+    "subjects":
         {
             "buyer": {
                 "human_id": u8,
-                "frames": [
+                "frames":
                     {
                         "joints21": [f32; 73],
-                        "body_normal": [f32; 3],
-                        "face_normal": [f32; 3],
-                    }
-                ],
+                        "body_normal": [f32; 2],
+                        "face_normal": [f32; 2],
+                    },
                 "initTrans": f32,
                 "initRot": f32
             },
             "leftSeller": {
                 "human_id": u8,
-                "frames": [
+                "frames":
                     {
                         "joints21": [f32; 73],
-                        "body_normal": [f32; 3],
-                        "face_normal": [f32; 3],
-                    }
-                ],
+                        "body_normal": [f32; 2],
+                        "face_normal": [f32; 2],
+                    },
                 "initTrans": f32,
                 "initRot": f32
             },
             "rightSeller": {
                 "human_id": u8,
-                "frames": [
+                "frames":
                     {
                         "joints21": [f32; 73],
-                        "body_normal": [f32; 3],
-                        "face_normal": [f32; 3],
-                    }
-                ],
+                        "body_normal": [f32; 2],
+                        "face_normal": [f32; 2],
+                    },
                 "initTrans": f32,
                 "initRot": f32
-            },
+            }
             "prediction<insert_name>": {
-                "human_id": None,
-                "frames": [
+                "human_id": u8,
+                "frames":
                     {
                         "joints21": [f32; 73],
-                        "body_normal": [f32; 3],
-                        "face_normal": [f32; 3],
-                    }
-                ],
+                        "body_normal": [f32; 2],
+                        "face_normal": [f32; 2],
+                    },
                 "initTrans": f32,
                 "initRot": f32
             }
         }
-    ]
 }
 ```
 # index to body part map
