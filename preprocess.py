@@ -364,7 +364,7 @@ def main(argv):
         # The meta directory contains the rest poses
         # datahandler.generate_rest_pose('meta', 'meta')
         skel = []
-        data_dict = {"winner_id": motionData['winnerId'], "subjects": {}}
+        data_dict = {"winner_id": motionData['winnerId'], "subjects": {}, "padding_length": 0}
         numFrames = motionData['subjects'][0]['joints19'].shape[1]
         padding_length = 0
         num_windows = int(numFrames / step_size)
@@ -418,7 +418,7 @@ def main(argv):
             end_index = start_index + window_size
         while end_index <= numFrames:
             for key in sub.keys():
-                positions = sub[bid][0][start_index:end_index, :, :]
+                positions = sub[key][0][start_index:end_index + 1, :, :]
                 h_form, initRot, initTrans = datahandler.export_animation(positions)
                 bodyNormal = sub[key][1][:, start_index:end_index]
                 faceNormal = sub[key][2][:, start_index:end_index]
@@ -438,25 +438,26 @@ def main(argv):
                     buyer = {"joints21": h_form,
                              "body_normal": bodyNormal,
                              "face_normal": faceNormal}
-                    subjects["buyer"]["frames"] = [buyer]
+                    subjects["buyer"]["frames"] = buyer
                     subjects["buyer"]["initRot"] = initRotEuler
                     subjects["buyer"]["initTrans"] = initTrans
                 elif key == lid:
                     leftSeller = {"joints21": h_form,
                                   "body_normal": bodyNormal,
                                   "face_normal": faceNormal}
-                    subjects["leftSeller"]["frames"] = [leftSeller]
+                    subjects["leftSeller"]["frames"] = leftSeller
                     subjects["leftSeller"]["initRot"] = initRotEuler
                     subjects["leftSeller"]["initTrans"] = initTrans
                 else:
                     rightSeller = {"joints21": h_form,
                                    "body_normal": bodyNormal,
                                    "face_normal": faceNormal}
-                    subjects["rightSeller"]["frames"] = [rightSeller]
+                    subjects["rightSeller"]["frames"] = rightSeller
                     subjects["rightSeller"]["initRot"] = initRotEuler
                     subjects["rightSeller"]["initTrans"] = initTrans
 
-            data_dict["subjects"] = [subjects]
+            data_dict["subjects"] = subjects
+            data_dict["padding_length"] = padding_length
             # save the file to the destined folder
             if file_group_name not in test_list:
                 file_name = str(train_count) + '.json'
@@ -478,6 +479,7 @@ def main(argv):
                 start_index += step_size
 
             end_index = start_index + window_size
+
 
 if __name__ == '__main__':
     app.run(main)
