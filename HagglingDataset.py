@@ -12,7 +12,7 @@ import Quaternions as Quaternions
 
 FLUGS = flags.FLAGS
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('input', 'debug', 'Directory containing input files')
+flags.DEFINE_string('input', '../../test_haggling/', 'Directory containing input files')
 
 
 class HagglingDataset(Dataset):
@@ -68,12 +68,12 @@ class HagglingDataset(Dataset):
             filename = os.path.join(input, file)
             with open(filename) as f:
                 data = json.load(f)
-            data = data['subjects'][0]
+            data = data['subjects']
 
             for subject in data:
-                frames = np.array(data[subject]['frames'][0]['joints21'])
-                body_norms = np.swapaxes(np.array(data[subject]['frames'][0]['body_normal']), 0, 1)
-                face_norms = np.swapaxes(np.array(data[subject]['frames'][0]['face_normal']), 0, 1)
+                frames = np.array(data[subject]['frames']['joints21'])
+                body_norms = np.swapaxes(np.array(data[subject]['frames']['body_normal']), 0, 1)
+                face_norms = np.swapaxes(np.array(data[subject]['frames']['face_normal']), 0, 1)
                 all_frames = np.concatenate([all_frames, frames], axis=0)
                 all_body_normals = np.concatenate([all_body_normals, body_norms], axis=0)
                 all_face_normals = np.concatenate([all_face_normals, face_norms], axis=0)
@@ -117,7 +117,7 @@ class HagglingDataset(Dataset):
             data = json.load(f)
 
         # select only the subjects
-        data = data['subjects'][0]
+        data = data['subjects']
 
         # transformed data
         transformed_data = {}
@@ -128,7 +128,7 @@ class HagglingDataset(Dataset):
             initTrans = data[subject]['initTrans']
 
             # normalize the joint vectors
-            joints21 = np.array(data[subject]['frames'][0]['joints21'])
+            joints21 = np.array(data[subject]['frames']['joints21'])
             joints21 = joints21 - self.mean
             joints21 = np.divide(joints21, self.std, out=np.zeros_like(joints21), where=self.std!=0)
 
