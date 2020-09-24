@@ -12,7 +12,7 @@ import Quaternions as Quaternions
 
 FLUGS = flags.FLAGS
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('input', '../../test_haggling/', 'Directory containing input files')
+flags.DEFINE_string('input', 'Data/train/', 'Directory containing input files')
 
 
 class HagglingDataset(Dataset):
@@ -60,35 +60,42 @@ class HagglingDataset(Dataset):
 
         # create the vectors
         all_frames = np.zeros((1, 73))
-        all_body_normals = np.zeros((1, 2))
-        all_face_normals = np.zeros((1, 2))
+        #all_body_normals = np.zeros((1, 2))
+        #all_face_normals = np.zeros((1, 2))
 
         # Read all files in directory
-        for file in os.listdir(input):
+        for i, file in enumerate(os.listdir(input)):
+
+            # progress report
+            if i%100 == 0:
+                print('Read '+str(i)+'.JSON')
+
             filename = os.path.join(input, file)
             with open(filename) as f:
                 data = json.load(f)
+                f.close()
+
             data = data['subjects']
 
             for subject in data:
                 frames = np.array(data[subject]['frames']['joints21'])
-                body_norms = np.swapaxes(np.array(data[subject]['frames']['body_normal']), 0, 1)
-                face_norms = np.swapaxes(np.array(data[subject]['frames']['face_normal']), 0, 1)
+                #body_norms = np.swapaxes(np.array(data[subject]['frames']['body_normal']), 0, 1)
+                #face_norms = np.swapaxes(np.array(data[subject]['frames']['face_normal']), 0, 1)
                 all_frames = np.concatenate([all_frames, frames], axis=0)
-                all_body_normals = np.concatenate([all_body_normals, body_norms], axis=0)
-                all_face_normals = np.concatenate([all_face_normals, face_norms], axis=0)
+                #all_body_normals = np.concatenate([all_body_normals, body_norms], axis=0)
+                #all_face_normals = np.concatenate([all_face_normals, face_norms], axis=0)
 
         # template for the stats files
         mean = {
             'joints21': np.mean(all_frames[1:], axis=0).reshape(1, -1).tolist(),
-            'body_normal': np.mean(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
-            'face_normal': np.mean(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
+            #'body_normal': np.mean(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
+            #'face_normal': np.mean(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
         }
 
         std = {
             'joints21': np.std(all_frames[1:], axis=0).reshape(1, -1).tolist(),
-            'body_normal': np.std(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
-            'face_normal': np.std(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
+            #'body_normal': np.std(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
+            #'face_normal': np.std(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
         }
 
         # write to files
@@ -98,9 +105,11 @@ class HagglingDataset(Dataset):
         try:
             with open(mean_file, 'w') as json_file:
                 json.dump(mean, json_file)
+                json_file.close()
 
             with open(std_file, 'w') as json_file:
                 json.dump(std, json_file)
+                json_file.close()
         except:
             print("error dumping stats to JSON")
 
@@ -117,6 +126,7 @@ class HagglingDataset(Dataset):
             data = json.load(f)
 
         # select only the subjects
+        padLength = data['padding_length']
         data = data['subjects']
 
         # transformed data
@@ -135,7 +145,8 @@ class HagglingDataset(Dataset):
             transformed_data[subject] = {
                 'initRot': np.array(initRot),
                 'initTrans': np.array(initTrans),
-                'joints21': joints21
+                'joints21': joints21,
+                'padLength': padLength
             }
 
         return transformed_data
@@ -161,12 +172,12 @@ def main(argv):
     i=2
 
     for sub in dataset[i]:
-        print(sub)
         x = dataset[i][sub]['joints21']
         x = dataset.denormalize_data(x)
         initRot = Quaternions.Quaternions.from_euler(dataset[i][sub]['initRot'])
         initTrans = dataset[i][sub]['initTrans']
-        x = skelHandler.recover_global_positions(x, initRot, initTrans)
+        padLength = dataset[i][sub]['padLength']
+        x = skelHandler.recover_global_positions(x[padLength:], initRot, initTrans)
         x = vis.conv_debug_visual_form(x)
         skels.append(x)
 
