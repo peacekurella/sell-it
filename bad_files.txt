@@ -61,3 +61,13 @@
 170404_haggling_b1_group1.pkl
 170407_haggling_a2_group1.pkl
 170404_haggling_a2_group0.pkl
+170228_haggling_a2_group2.pkl
+170404_haggling_b1_group4.pkl
+170221_haggling_b2_group4.pkl
+170224_haggling_b3_group0.pkl
+170407_haggling_b1_group7.pkl
+170407_haggling_b1_group4.pkl
+170407_haggling_b2_group0.pkl
+170407_haggling_b2_group6.pkl
+170404_haggling_b2_group7.pkl
+170224_haggling_b1_group2.pkl
