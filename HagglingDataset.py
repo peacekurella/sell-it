@@ -2,17 +2,7 @@ import os
 import json
 import numpy as np
 
-from absl import app
-from absl import flags
-
 from torch.utils.data import Dataset
-from DebugVisualizer import DebugVisualizer
-from preprocess import SkeletonHandler
-import Quaternions as Quaternions
-
-FLUGS = flags.FLAGS
-flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('input', 'Data/train/', 'Directory containing input files')
 
 
 class HagglingDataset(Dataset):
@@ -60,15 +50,15 @@ class HagglingDataset(Dataset):
 
         # create the vectors
         all_frames = np.zeros((1, 73))
-        #all_body_normals = np.zeros((1, 2))
-        #all_face_normals = np.zeros((1, 2))
+        # all_body_normals = np.zeros((1, 2))
+        # all_face_normals = np.zeros((1, 2))
 
         # Read all files in directory
         for i, file in enumerate(os.listdir(input)):
 
             # progress report
-            if i%100 == 0:
-                print('Read '+str(i)+'.JSON')
+            if i % 100 == 0:
+                print('Read ' + str(i) + '.JSON')
 
             filename = os.path.join(input, file)
             with open(filename) as f:
@@ -79,23 +69,23 @@ class HagglingDataset(Dataset):
 
             for subject in data:
                 frames = np.array(data[subject]['frames']['joints21'])
-                #body_norms = np.swapaxes(np.array(data[subject]['frames']['body_normal']), 0, 1)
-                #face_norms = np.swapaxes(np.array(data[subject]['frames']['face_normal']), 0, 1)
+                # body_norms = np.swapaxes(np.array(data[subject]['frames']['body_normal']), 0, 1)
+                # face_norms = np.swapaxes(np.array(data[subject]['frames']['face_normal']), 0, 1)
                 all_frames = np.concatenate([all_frames, frames], axis=0)
-                #all_body_normals = np.concatenate([all_body_normals, body_norms], axis=0)
-                #all_face_normals = np.concatenate([all_face_normals, face_norms], axis=0)
+                # all_body_normals = np.concatenate([all_body_normals, body_norms], axis=0)
+                # all_face_normals = np.concatenate([all_face_normals, face_norms], axis=0)
 
         # template for the stats files
         mean = {
             'joints21': np.mean(all_frames[1:], axis=0).reshape(1, -1).tolist(),
-            #'body_normal': np.mean(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
-            #'face_normal': np.mean(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
+            # 'body_normal': np.mean(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
+            # 'face_normal': np.mean(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
         }
 
         std = {
             'joints21': np.std(all_frames[1:], axis=0).reshape(1, -1).tolist(),
-            #'body_normal': np.std(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
-            #'face_normal': np.std(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
+            # 'body_normal': np.std(all_body_normals[1:], axis=0).reshape(1, -1).tolist(),
+            # 'face_normal': np.std(all_face_normals[1:], axis=0).reshape(1, -1).tolist()
         }
 
         # write to files
@@ -140,7 +130,7 @@ class HagglingDataset(Dataset):
             # normalize the joint vectors
             joints21 = np.array(data[subject]['frames']['joints21'])
             joints21 = joints21 - self.mean
-            joints21 = np.divide(joints21, self.std, out=np.zeros_like(joints21), where=self.std!=0)
+            joints21 = np.divide(joints21, self.std, out=np.zeros_like(joints21), where=self.std != 0)
 
             transformed_data[subject] = {
                 'initRot': np.array(initRot),
@@ -161,27 +151,3 @@ class HagglingDataset(Dataset):
         x = joints21 * self.std
         x = x + self.mean
         return x
-
-
-def main(argv):
-
-    dataset = HagglingDataset(FLUGS)
-    vis = DebugVisualizer()
-    skelHandler = SkeletonHandler()
-    skels = []
-    i=2
-
-    for sub in dataset[i]:
-        x = dataset[i][sub]['joints21']
-        x = dataset.denormalize_data(x)
-        initRot = Quaternions.Quaternions.from_euler(dataset[i][sub]['initRot'])
-        initTrans = dataset[i][sub]['initTrans']
-        padLength = dataset[i][sub]['padLength']
-        x = skelHandler.recover_global_positions(x[padLength:], initRot, initTrans)
-        x = vis.conv_debug_visual_form(x)
-        skels.append(x)
-
-    vis.create_animation(skels, None)
-
-if __name__ == '__main__':
-    app.run(main)
