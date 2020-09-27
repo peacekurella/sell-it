@@ -8,14 +8,14 @@ from torch.utils.data import Dataset
 class HagglingDataset(Dataset):
     """Haggling Dataset"""
 
-    def __init__(self, FLAGS):
+    def __init__(self, directory, FLAGS):
         """
         Constructor for the dataset
         :param FLAGS: required flags
         """
 
         # save the directory info
-        self.input = FLAGS.input
+        self.input = directory
         self.meta = FLAGS.meta
 
         # Load the mean and std filenames

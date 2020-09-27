@@ -2,17 +2,17 @@ import os
 import torch.nn as nn
 import torch
 
-from ConvEncoderSingle import ConvEncoderSingle
+from ConvEncoderDouble import ConvEncoderDouble
 from ConvDecoderSingle import ConvDecoderSingle
 
 
-class BodyAE(nn.Module):
+class BodyMotionGenerator(nn.Module):
     """Defines the body auto encoder class"""
 
     def __init__(self, FLAGS):
 
-        super(BodyAE, self).__init__()
-        self.encoder = ConvEncoderSingle(FLAGS)
+        super(BodyMotionGenerator, self).__init__()
+        self.encoder = ConvEncoderDouble(FLAGS)
         self.decoder = ConvDecoderSingle(FLAGS)
 
     def forward(self, x):
@@ -80,8 +80,28 @@ class BodyAE(nn.Module):
         """
 
         params = [
-            {'params': self.encoder.parameters()},
-            {'params': self.decoder.parameters()},
+            {'params': self.encoder.parameters()}
         ]
 
         return params
+
+    def load_transfer_params(self, path):
+        """
+        loads transferable parameteres from other models
+        :param path: directory for saved model
+        :return: load succesful or not in bool
+        """
+
+        # create the encoder and decoder paths
+        dec_path = os.path.join(path, 'decoder/')
+
+        # try to load the models
+        # noinspection PyBroadException
+        try:
+            self.decoder.load_state_dict(torch.load(dec_path))
+            print("Transfer load successful!")
+        except:
+            print("Transfer load failed!")
+            return False
+
+        return True
