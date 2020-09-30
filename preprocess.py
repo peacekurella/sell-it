@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('source', 'HagglingData/', 'Input folder containing source pickle files')
 flags.DEFINE_string('output', 'Data/', 'Output folder to place new files')
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
-flags.DEFINE_integer('step_size', 10, 'window step size')
+flags.DEFINE_integer('step_size', 60, 'window step size')
 
 
 class SkeletonHandler:
@@ -423,10 +423,13 @@ def main(argv):
                 end_index = start_index + window_size
             while end_index <= numFrames:
                 for key in sub.keys():
-                    positions = sub[key][0][start_index:end_index + 1, :, :]
+                    if end_index == numFrames:
+                        positions = sub[key][0][start_index - 1:end_index, :, :].copy()
+                    else:
+                        positions = sub[key][0][start_index:end_index + 1, :, :].copy()
                     h_form, initRot, initTrans = datahandler.export_animation(positions)
-                    bodyNormal = sub[key][1][:, start_index:end_index]
-                    faceNormal = sub[key][2][:, start_index:end_index]
+                    bodyNormal = sub[key][1][:, start_index:end_index].copy()
+                    faceNormal = sub[key][2][:, start_index:end_index].copy()
                     # padding the arrays
                     if start_index < padding_length:
                         h_form = np.pad(h_form, ((padding_length, 0), (0, 0)))
