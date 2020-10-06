@@ -1,7 +1,7 @@
 import os
 import wandb
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 from absl import app
 from absl import flags
