@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('source', 'HagglingData/', 'Input folder containing source pickle files')
 flags.DEFINE_string('output', 'Data/', 'Output folder to place new files')
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
-flags.DEFINE_integer('step_size', 10, 'window step size')
+flags.DEFINE_integer('step_size', 60, 'window step size')
 
 
 class SkeletonHandler:
@@ -331,6 +331,75 @@ class SkeletonHandler:
         return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
 
 
+def save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal):
+    subject_info = {"joints21": h_form,
+                    "body_normal": bodyNormal,
+                    "face_normal": faceNormal}
+    subjects[key_string]["frames"] = subject_info
+    subjects[key_string]["initRot"] = initRotEuler
+    subjects[key_string]["initTrans"] = initTrans
+
+    return subjects
+
+
+def get_window_info(start_index, end_index, numFrames, padding_length, sub, key, datahandler):
+    # adjust start and end index to get the correct number of frames in the window
+    if end_index == numFrames:
+        positions = sub[key][0][start_index - 1:end_index, :, :].copy()
+    else:
+        positions = sub[key][0][start_index:end_index + 1, :, :].copy()
+
+    # convert positions to required format
+    h_form, initRot, initTrans = datahandler.export_animation(positions)
+    bodyNormal = sub[key][1][:, start_index:end_index].copy()
+    faceNormal = sub[key][2][:, start_index:end_index].copy()
+    # padding the arrays
+    if start_index < padding_length:
+        h_form = np.pad(h_form, ((padding_length, 0), (0, 0)))
+        bodyNormal = np.pad(bodyNormal, ((0, 0), (padding_length, 0)))
+        faceNormal = np.pad(faceNormal, ((0, 0), (padding_length, 0)))
+
+    # convert rotation quaternion to euler form list, also convert all np arrays to list
+    initRotEuler = initRot.euler().tolist()
+    initTrans = initTrans.tolist()
+    h_form = h_form.tolist()
+    bodyNormal = bodyNormal.tolist()
+    faceNormal = faceNormal.tolist()
+
+    return h_form, initRotEuler, initTrans, bodyNormal, faceNormal
+
+
+def read_pkl_and_extract_skeleton(motionData, sub, datahandler):
+    # Read the pkl file
+    for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
+
+        # get humanId
+        humanId = subjectInfo['humanId']
+
+        # get bodyNormal and faceNormal Info
+        bodyNormal = subjectInfo['bodyNormal'][1:]
+        faceNormal = subjectInfo['faceNormal'][1:]
+
+        # read in the pose data from pkl file
+        normalizedPose = subjectInfo['joints19']
+
+        # retarget onto CMU skeleton
+        anim = datahandler.retarget_skeleton(normalizedPose)
+
+        # Do FK recover 3D joint positions, select required Joints only
+        positions = Animation.positions_global(anim)
+        positions = positions[:, datahandler.jointIdx]
+
+        sub[humanId] = [positions, bodyNormal, faceNormal]
+
+
+def write_window(folder_name, file_name, data_dict):
+    # write the file to the given folder
+    x = open(folder_name + file_name, 'w')
+    with x as outfile:
+        json.dump(data_dict, outfile, sort_keys=False, indent=2)
+
+
 def main(argv):
     print('flag arguments')
     print('source folder', FLAGS.source)
@@ -366,9 +435,11 @@ def main(argv):
             r = open(read_file, "rb")
             motionData = pickle.load(r, encoding="Latin-1")
             datahandler = SkeletonHandler()
+
             # The meta directory contains the rest poses
             # datahandler.generate_rest_pose('meta', 'meta')
-            skel = []
+            # skel = []
+
             data_dict = {"winner_id": motionData['winnerId'], "subjects": {}, "padding_length": 0}
             numFrames = motionData['subjects'][0]['joints19'].shape[1]
             padding_length = 0
@@ -377,32 +448,13 @@ def main(argv):
                 padding_length = step_size - (numFrames % step_size)
                 num_windows += 1
 
+            # create dictionary for each subject
             bid = motionData['buyerId']
             lid = motionData['leftSellerId']
             rid = motionData['rightSellerId']
             sub = {bid: [], lid: [], rid: []}
 
-            # Read the pkl file
-            for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
-
-                # get humanId
-                humanId = subjectInfo['humanId']
-
-                # get bodyNormal and faceNormal Info
-                bodyNormal = subjectInfo['bodyNormal'][1:]
-                faceNormal = subjectInfo['faceNormal'][1:]
-
-                # read in the pose data from pkl file
-                normalizedPose = subjectInfo['joints19']
-
-                # retarget onto CMU skeleton
-                anim = datahandler.retarget_skeleton(normalizedPose)
-
-                # Do FK recover 3D joint positions, select required Joints only
-                positions = Animation.positions_global(anim)
-                positions = positions[:, datahandler.jointIdx]
-
-                sub[humanId] = [positions, bodyNormal, faceNormal]
+            read_pkl_and_extract_skeleton(motionData, sub, datahandler)
 
             subjects = {'buyer': {"human_Id": bid, "initRot": [],
                                   "initTrans": [], "frames": [{}]},
@@ -413,69 +465,47 @@ def main(argv):
 
             name = file.split('.')[0]
             file_char = name.split('_')
+
             # to check if file should be in test or train folder
             file_group_name = '_'.join(file_char[0:-1])
+
             start_index = 0
             # if padding, then end_index needs to be adjusted
             if padding_length > 0:
                 end_index = start_index + window_size - padding_length
             else:
                 end_index = start_index + window_size
+
             while end_index <= numFrames:
                 for key in sub.keys():
-                    positions = sub[key][0][start_index:end_index + 1, :, :]
-                    h_form, initRot, initTrans = datahandler.export_animation(positions)
-                    bodyNormal = sub[key][1][:, start_index:end_index]
-                    faceNormal = sub[key][2][:, start_index:end_index]
-                    # padding the arrays
-                    if start_index < padding_length:
-                        h_form = np.pad(h_form, ((padding_length, 0), (0, 0)))
-                        bodyNormal = np.pad(bodyNormal, ((0, 0), (padding_length, 0)))
-                        faceNormal = np.pad(faceNormal, ((0, 0), (padding_length, 0)))
-                    # convert rotation quaternion to euler form list, also convert all np arrays to list
-                    initRotEuler = initRot.euler().tolist()
-                    initTrans = initTrans.tolist()
-                    h_form = h_form.tolist()
-                    bodyNormal = bodyNormal.tolist()
-                    faceNormal = faceNormal.tolist()
+                    h_form, initRotEuler, initTrans, bodyNormal, faceNormal = get_window_info(start_index, end_index,
+                                                                                              numFrames,
+                                                                                              padding_length, sub, key,
+                                                                                              datahandler)
                     # save to the appropriate dictionary
                     if key == bid:
-                        buyer = {"joints21": h_form,
-                                 "body_normal": bodyNormal,
-                                 "face_normal": faceNormal}
-                        subjects["buyer"]["frames"] = buyer
-                        subjects["buyer"]["initRot"] = initRotEuler
-                        subjects["buyer"]["initTrans"] = initTrans
+                        key_string = "buyer"
+                        save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal)
                     elif key == lid:
-                        leftSeller = {"joints21": h_form,
-                                      "body_normal": bodyNormal,
-                                      "face_normal": faceNormal}
-                        subjects["leftSeller"]["frames"] = leftSeller
-                        subjects["leftSeller"]["initRot"] = initRotEuler
-                        subjects["leftSeller"]["initTrans"] = initTrans
+                        key_string = "leftSeller"
+                        save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal)
                     else:
-                        rightSeller = {"joints21": h_form,
-                                       "body_normal": bodyNormal,
-                                       "face_normal": faceNormal}
-                        subjects["rightSeller"]["frames"] = rightSeller
-                        subjects["rightSeller"]["initRot"] = initRotEuler
-                        subjects["rightSeller"]["initTrans"] = initTrans
+                        key_string = "rightSeller"
+                        save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal)
 
                 data_dict["subjects"] = subjects
                 data_dict["padding_length"] = padding_length
+
                 # save the file to the destined folder
                 if file_group_name not in test_list:
                     file_name = str(train_count) + '.json'
-                    x = open(train_folder + file_name, 'w')
-                    with x as outfile:
-                        json.dump(data_dict, outfile, sort_keys=False, indent=2)
+                    write_window(train_folder, file_name, data_dict)
                     train_count += 1
                 else:
                     file_name = str(test_count) + '.json'
-                    x = open(test_folder + file_name, 'w')
-                    with x as outfile:
-                        json.dump(data_dict, outfile, sort_keys=False, indent=2)
+                    write_window(test_folder, file_name, data_dict)
                     test_count += 1
+
                 # if padding, start_index of next window needs to be adjusted to maintain proper overlap
                 if start_index < padding_length:
                     start_index += step_size - padding_length
