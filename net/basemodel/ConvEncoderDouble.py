@@ -27,9 +27,9 @@ class ConvEncoderDouble(nn.Module):
             nn.MaxPool1d(kernel_size=2, stride=2),  # 256, 73, 120
         )
 
-    def foward(self, x):
+    def forward(self, x):
         """
-        Defines the foward pass through the network
+        Defines the forward pass through the network
         :param x: Input to the encoder (batch_size, f, 146)
         :return: Output of the encoder (batch_size, f/2, 256)
         """

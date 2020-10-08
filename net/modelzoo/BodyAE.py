@@ -1,6 +1,7 @@
 import os
 import torch.nn as nn
 import torch
+import glob
 
 from ConvEncoderSingle import ConvEncoderSingle
 from ConvDecoderSingle import ConvDecoderSingle
@@ -27,10 +28,11 @@ class BodyAE(nn.Module):
 
         return out
 
-    def save_model(self, path):
+    def save_model(self, path, epoch):
         """
         Saves the model parameters
         :param path: directory for saving the model
+        :param epoch: epoch number
         :return: save successful or not in bool
         """
 
@@ -38,11 +40,17 @@ class BodyAE(nn.Module):
         enc_path = os.path.join(path, 'encoder/')
         dec_path = os.path.join(path, 'decoder/')
 
+        # create a directory if not a directory
+        if not os.path.isdir(enc_path):
+            os.makedirs(enc_path)
+        if not os.path.isdir(dec_path):
+            os.makedirs(dec_path)
+
         # try to save the models
         # noinspection PyBroadException
         try:
-            torch.save(self.encoder.state_dict(), enc_path)
-            torch.save(self.decoder.state_dict(), dec_path)
+            torch.save(self.encoder.state_dict(), enc_path + str(epoch) + '.ckpt')
+            torch.save(self.decoder.state_dict(), dec_path + str(epoch) + '.ckpt')
             print("save successful!")
         except:
             print("save failed!")
@@ -50,16 +58,25 @@ class BodyAE(nn.Module):
 
         return True
 
-    def load_model(self, path):
+    def load_model(self, path, epoch):
         """
         Loads the saved model parameters
         :param path: directory for saved model
+        :param epoch: epoch number
         :return: load successful or not in bool
         """
 
         # create the encoder and decoder paths
         enc_path = os.path.join(path, 'encoder/')
         dec_path = os.path.join(path, 'decoder/')
+
+        # check if epoch number is passed
+        if epoch is not None:
+            enc_path = enc_path + str(epoch) + '.ckpt'
+            dec_path = dec_path + str(epoch) + '.ckpt'
+        else:
+            enc_path = max(glob.glob(enc_path+'*'), key=os.path.getctime)
+            dec_path = max(glob.glob(dec_path + '*'), key=os.path.getctime)
 
         # try to load the models
         # noinspection PyBroadException

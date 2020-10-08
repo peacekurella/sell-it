@@ -19,8 +19,8 @@ flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 50, 'Training epochs')
-flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+flags.DEFINE_integer('epochs', 20, 'Training epochs')
+flags.DEFINE_integer('ckpt', 2, 'Number of epochs to checkpoint')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
 
@@ -93,26 +93,27 @@ def get_scheduler(optimizer):
 
 def main(args):
     # initialize the dataset and the data loader
-    train_dataset = HagglingDataset(FLAGS.input, FLAGS)
+    train_dataset = HagglingDataset(FLAGS.train, FLAGS)
     train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
-    test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size * 2, shuffle=True, num_workers=10)
+    test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
 
     # initialize the model
     model = get_model()
+    run = wandb.init(project='bodyAE', reinit=True)
 
     # restore model if needed
     if FLAGS.resume_train:
         if FLAGS.pretrain:
-            ckpt = os.path.join(FLAGS.ckpt, 'AE/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
         else:
-            ckpt = os.path.join(FLAGS.ckpt, 'ME/')
-        model.load_model(ckpt)
+            ckpt = os.path.join(FLAGS.ckpt_dir, 'ME/')
+        model.load_model(ckpt, None)
 
     # restore model partially if not pretraining
     if not FLAGS.pretrain:
-        ckpt = os.path.join(FLAGS.ckpt, 'AE/')
-        model.load_transfer_parameters(ckpt)
+        ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
+        model.load_transfer_params(ckpt, None)
 
     # get the loss function and optimizers
     criterion = get_loss_fn()
@@ -122,13 +123,14 @@ def main(args):
     wandb.watch(model)
 
     # run the training script
-    for epoch in range(FLAGS.epochs):
+    for epoch in range(1, FLAGS.epochs+1):
 
         # initialize the total epoch loss values
         epoch_train_loss = 0.0
         epoch_val_loss = 0.0
 
         #  calculate training loss, update params
+        count_train = 0
         for i_batch, batch in enumerate(train_dataloader):
             # set model to train mode
             model.train()
@@ -143,12 +145,14 @@ def main(args):
             # calculate loss
             batch_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
             epoch_train_loss += batch_loss
+            count_train += 1
 
             # calculate gradients
             batch_loss.backward()
             optimizer.step()
 
         # calculate validation loss
+        count_test = 0
         for i_batch, batch in enumerate(test_dataloader):
             # set the model to evaluation mode
             model.eval()
@@ -162,20 +166,22 @@ def main(args):
             # calculate loss
             val_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
             epoch_val_loss += val_loss
+            count_test += 1
 
         # log the metrics
         wandb.log({
-            'train_loss': epoch_train_loss,
-            'val_loss': epoch_val_loss
+            'train_loss': epoch_train_loss / count_train,
+            'val_loss': epoch_val_loss / count_test
         })
 
         if epoch % FLAGS.ckpt == 0:
             if FLAGS.pretrain:
-                ckpt = os.path.join(FLAGS.ckpt, 'AE/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
             else:
-                ckpt = os.path.join(FLAGS.ckpt, 'ME/')
-            model.save_model(ckpt)
+                ckpt = os.path.join(FLAGS.ckpt_dir, 'ME/')
+            model.save_model(ckpt, epoch)
 
+    run.finish()
 
 if __name__ == '__main__':
     app.run(main)
