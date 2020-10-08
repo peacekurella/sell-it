@@ -30,7 +30,7 @@ flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 
 def get_inputs(batch):
     """
-    Generates the inputs to the netwo
+    Generates the inputs to the network
     :param batch: batch for training
     :return: train_x, train_y tensors
     """
@@ -96,7 +96,7 @@ def main(args):
     train_dataset = HagglingDataset(FLAGS.train, FLAGS)
     train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
-    test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
+    test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
     # initialize the model
     model = get_model()
@@ -123,17 +123,20 @@ def main(args):
     wandb.watch(model)
 
     # run the training script
-    for epoch in range(1, FLAGS.epochs+1):
+    for epoch in range(1, FLAGS.epochs + 1):
 
         # initialize the total epoch loss values
         epoch_train_loss = 0.0
         epoch_val_loss = 0.0
 
+        # set model to train mode
+        model.train()
+
         #  calculate training loss, update params
         count_train = 0
         for i_batch, batch in enumerate(train_dataloader):
-            # set model to train mode
-            model.train()
+
+            # zero prev gradients
             optimizer.zero_grad()
 
             # get train input and labels
@@ -144,6 +147,7 @@ def main(args):
 
             # calculate loss
             batch_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
+            #del data, targets
             epoch_train_loss += batch_loss
             count_train += 1
 
@@ -151,22 +155,24 @@ def main(args):
             batch_loss.backward()
             optimizer.step()
 
+        # set the model to evaluation mode
+        model.eval()
+
         # calculate validation loss
-        count_test = 0
-        for i_batch, batch in enumerate(test_dataloader):
-            # set the model to evaluation mode
-            model.eval()
+        with torch.no_grad():
+            count_test = 0
+            for i_batch, batch in enumerate(test_dataloader):
 
-            # get train input and labels
-            data, targets = get_inputs(batch)
+                # get train input and labels
+                data, targets = get_inputs(batch)
 
-            # forward pass through the network
-            predictions = model(data)
+                # forward pass through the network
+                predictions = model(data)
 
-            # calculate loss
-            val_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
-            epoch_val_loss += val_loss
-            count_test += 1
+                # calculate loss
+                val_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
+                epoch_val_loss += val_loss
+                count_test += 1
 
         # log the metrics
         wandb.log({
@@ -178,7 +184,7 @@ def main(args):
             if FLAGS.pretrain:
                 ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
             else:
-                ckpt = os.path.join(FLAGS.ckpt_dir, 'ME/')
+                ckpt = os.path.join(FLAGS.ckpt, 'ME/')
             model.save_model(ckpt, epoch)
 
     run.finish()
