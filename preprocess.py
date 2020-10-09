@@ -15,7 +15,7 @@ from DebugVisualizer import DebugVisualizer
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('source', 'HagglingData/', 'Input folder containing source pickle files')
-flags.DEFINE_string('output', 'Data/', 'Output folder to place new files')
+flags.DEFINE_string('output', '../Data/', 'Output folder to place new files')
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
 flags.DEFINE_integer('step_size', 10, 'window step size')
 

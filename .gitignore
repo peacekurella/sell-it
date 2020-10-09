@@ -9,4 +9,6 @@ HagglingData/
 .idea/sell-it.iml
 __pycache__/
 venv/
+meta/mean.json
+meta/std.json
 
