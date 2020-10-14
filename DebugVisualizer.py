@@ -165,7 +165,7 @@ class DebugVisualizer:
         # save only if filename is passed
         if fileName:
             print(fileName + '.mp4')
-            matplotlib.use("Agg")
+            #matplotlib.use("Agg")
             ani.save(fileName + '.mp4', writer=self.writer)
         else:
             plt.show(self.fig)
