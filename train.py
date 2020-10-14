@@ -9,7 +9,7 @@ from absl import flags
 from HagglingDataset import HagglingDataset
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
-from losses import reconstruction_l1
+from losses import *
 
 FLAGS = flags.FLAGS
 
@@ -19,12 +19,12 @@ flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 20, 'Training epochs')
-flags.DEFINE_integer('ckpt', 2, 'Number of epochs to checkpoint')
-flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
+flags.DEFINE_integer('epochs', 150, 'Training epochs')
+flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
 
-flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
+flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 
 
@@ -39,8 +39,8 @@ def get_inputs(batch):
     r = batch['rightSeller']['joints21']
 
     if FLAGS.pretrain:
-        train_x = torch.cat((b, l, r), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((b, l, r), dim=0).permute(0, 2, 1).float().cuda()
+        train_x = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
+        train_y = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
         return train_x, train_y
     else:
         set_x_a = torch.cat((b, l), dim=2)
@@ -135,7 +135,6 @@ def main(args):
         #  calculate training loss, update params
         count_train = 0
         for i_batch, batch in enumerate(train_dataloader):
-
             # zero prev gradients
             optimizer.zero_grad()
 
@@ -147,7 +146,6 @@ def main(args):
 
             # calculate loss
             batch_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
-            #del data, targets
             epoch_train_loss += batch_loss
             count_train += 1
 
@@ -162,7 +160,6 @@ def main(args):
         with torch.no_grad():
             count_test = 0
             for i_batch, batch in enumerate(test_dataloader):
-
                 # get train input and labels
                 data, targets = get_inputs(batch)
 
@@ -170,7 +167,7 @@ def main(args):
                 predictions = model(data)
 
                 # calculate loss
-                val_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
+                val_loss = meanJointPoseError(predictions, targets)
                 epoch_val_loss += val_loss
                 count_test += 1
 
@@ -184,10 +181,11 @@ def main(args):
             if FLAGS.pretrain:
                 ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
             else:
-                ckpt = os.path.join(FLAGS.ckpt, 'ME/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, 'ME/')
             model.save_model(ckpt, epoch)
 
     run.finish()
+
 
 if __name__ == '__main__':
     app.run(main)

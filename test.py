@@ -16,11 +16,11 @@ from preprocess import SkeletonHandler
 FLGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('test', '../Data/test/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', '../Data/output/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', '../ckpt/AE', 'file containing the model weights')
+flags.DEFINE_string('test', 'Data/test/', 'Directory containing test files')
+flags.DEFINE_string('output_dir', 'Data/output/', 'Folder to store final videos')
+flags.DEFINE_string('ckpt', 'ckpt/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
-flags.DEFINE_boolean('bodyae', True, 'if True checks BodyAE model')
+flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 
 
 def get_input(batch):
@@ -90,7 +90,8 @@ def main(arg):
 
     model = get_model(FLGS)
 
-    model.load_model(ckpt, 18)
+    model.load_model(ckpt, None)
+    model.eval()
 
     skeletonHandler = SkeletonHandler()
 
@@ -99,7 +100,6 @@ def main(arg):
     with torch.no_grad():
 
         for i_batch, batch in enumerate(test_dataloader):
-            model.eval()
 
             # get test input and labels
             data, targets = get_input(batch)

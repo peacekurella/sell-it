@@ -22,3 +22,14 @@ def reconstruction_l1(predictions, targets, model_params, lmd):
         l1_loss +=  torch.norm(param, 1)
 
     return mse + (lmd * l1_loss)
+
+def meanJointPoseError(predictions, targets):
+    """
+    Defines an MSE loss
+    :param predictions: predictions from the model
+    :param targets: ground truths
+    :return: average loss for the predicition
+    """
+
+    loss = nn.MSELoss(reduction='mean')
+    return  loss(predictions, targets)
