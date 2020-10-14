@@ -11,4 +11,5 @@ __pycache__/
 venv/
 meta/mean.json
 meta/std.json
+meta/*.joblib
 

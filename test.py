@@ -4,7 +4,9 @@ import torch
 import torch.nn as nn
 from absl import app
 from absl import flags
+from joblib import load
 from torch.utils.data import DataLoader
+from sklearn.cluster import KMeans
 
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
@@ -22,8 +24,11 @@ flags.DEFINE_string('ckpt', 'ckpt/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 
+pss = lambda a, b: a == b
+
 
 def get_input(batch):
+    # construct inputs according to the model we are testing
     b = batch['buyer']['joints21']
     l = batch['leftSeller']['joints21']
     r = batch['rightSeller']['joints21']
@@ -48,7 +53,7 @@ def get_model(FLAGS):
 
 
 def get_global_positions_denormalized(subjects, subject_params, FLAGS):
-    print(subjects[0].shape)
+    # denormalize and globalize positions of humans
     skeletonHandler = SkeletonHandler()
     haggling = HagglingDataset(FLAGS.test, FLAGS)
     r_target_global = skeletonHandler.recover_global_positions(
@@ -80,12 +85,26 @@ def get_subject_loss(targets, predictions):
     return mse
 
 
+def pose_structure_score(r_target, r_prediction, l_target, l_prediction):
+    # calculates mean pss score for left and right seller in a batch
+    kmeans = load('meta/50.joblib')
+    r_labels_q = kmeans.predict(r_target)
+    r_labels_p = kmeans.predict(r_prediction)
+    rpss = pss(r_labels_p, r_labels_q)
+    rpss = sum(rpss) / r_labels_p.shape[0]
+    l_labels_q = kmeans.predict(l_target)
+    l_labels_p = kmeans.predict(l_prediction)
+    lpss = pss(l_labels_p, l_labels_q)
+    lpss = sum(lpss) / l_labels_p.shape[0]
+    return rpss, lpss
+
+
 def main(arg):
     test_dataset = HagglingDataset(FLGS.test, FLGS)
     test_dataloader = DataLoader(test_dataset, num_workers=10)
     ckpt = FLGS.ckpt
     output_folder = FLGS.output_dir
-
+    # output folder for videos
     os.makedirs(output_folder, exist_ok=True)
 
     model = get_model(FLGS)
@@ -94,8 +113,10 @@ def main(arg):
     model.eval()
 
     skeletonHandler = SkeletonHandler()
-
+    # for storing loss values and pss values
     loss_dict = {'rightSeller': [], 'leftSeller': []}
+
+    pss_eval = {'rightSeller': [], 'leftSeller': []}
 
     with torch.no_grad():
 
@@ -120,6 +141,13 @@ def main(arg):
             l_target = targets[1].cpu().numpy()
             l_prediction = predictions[1].cpu().numpy()
 
+            # get PSS evaluation score for the batch
+            rpss, lpss = pose_structure_score(r_target.copy().astype(float), r_prediction.copy().astype(float),
+                                              l_target.copy().astype(float), l_prediction.copy().astype(float))
+            pss_eval['rightSeller'].append(rpss)
+            pss_eval['leftSeller'].append(lpss)
+            print(rpss, lpss)
+
             subjects = [r_target.copy(), r_prediction.copy(), l_target.copy(),
                         l_prediction.copy()]
 
@@ -140,8 +168,9 @@ def main(arg):
             loss_dict['rightSeller'].append(r_loss)
             l_loss = get_subject_loss(l_target_global.copy(), l_prediction_global.copy())
             print(l_loss)
+            print(r_loss)
             loss_dict['leftSeller'].append(l_loss)
-
+            # prepare skeletons to write in the video
             skel1 = []
             skel2 = []
             vis1 = DebugVisualizer()
@@ -188,10 +217,14 @@ def main(arg):
             # save the videos
             file_location = output_folder + str(i_batch)
             os.makedirs(file_location, exist_ok=True)
-            vis1.create_animation(skel1, file_location + '/test1')
+            vis1.create_animation(skel1, file_location + '/testRight')
             file_location = output_folder + str(i_batch)
             os.makedirs(file_location, exist_ok=True)
-            vis2.create_animation(skel2, file_location + '/test2')
+            vis2.create_animation(skel2, file_location + '/testLeft')
+
+        rPss = sum(pss_eval['rightSeller']) / len(pss_eval['rightSeller'])
+        lPss = sum(pss_eval['leftSeller']) / len(pss_eval['leftSeller'])
+        print("Mean PSS Evaluation score, RightSeller : ", str(rPss), " LeftSeller : ", str(lPss))
 
 
 if __name__ == "__main__":
