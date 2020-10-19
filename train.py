@@ -1,6 +1,11 @@
+import sys
+sys.path.append("net")
+sys.path.append("net/modelzoo")
+sys.path.append("net/basemodel")
+sys.path.append("motion")
+
 import os
 import wandb
-import torch
 from torch.utils.data import DataLoader
 
 from absl import app
@@ -14,9 +19,9 @@ from losses import *
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', '../Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', '../Data/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', '../ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
+flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
