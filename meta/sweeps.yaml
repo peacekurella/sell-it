@@ -1,0 +1,20 @@
+program: train.py
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  learning_rate:
+    min: 0.00001
+    max: 0.001
+  epochs:
+    min: 50
+    max: 500
+  lmd:
+    min: 0.0001
+    max: 0.003
+  batch_size:
+    min: 32
+    max: 256
+  optimizer:
+    values: ["adam", "sgd", "rmsprop"]

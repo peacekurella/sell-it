@@ -12,4 +12,5 @@ venv/
 meta/mean.json
 meta/std.json
 meta/*.joblib
+wandb/*
 

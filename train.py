@@ -14,18 +14,20 @@ from losses import *
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('train', '../Data/train/', 'Directory containing train files')
+flags.DEFINE_string('test', '../Data/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', '../ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
+flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 
-flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
+flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
+flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
 
 
 def get_inputs(batch):
@@ -56,7 +58,7 @@ def get_model():
     :return: PyTorch model that extends nn.Module
     """
 
-    if FLAGS.pretrain:
+    if FLAGS.model == 'bodyAE':
         return BodyAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
@@ -77,8 +79,12 @@ def get_optimizer(parameters):
     :parameters: model parametres to be tuned
     :return: optimizer
     """
-
-    return torch.optim.Adamax(parameters, lr=FLAGS.learning_rate)
+    if FLAGS.optimizer == "adam":
+        return torch.optim.Adamax(parameters, lr=FLAGS.learning_rate)
+    elif FLAGS.optimizer == "rmsprop":
+        return torch.optim.RMSprop(parameters, lr=FLAGS.learning_rate)
+    else:
+        return torch.optim.SGD(parameters, lr=FLAGS.learning_rate)
 
 
 def get_scheduler(optimizer):
@@ -98,9 +104,18 @@ def main(args):
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
+    # get default_hyperparameters
+    hyperparameter_defaults = dict(
+        batch_size=FLAGS.batch_size,
+        learning_rate=FLAGS.learning_rate,
+        epochs=FLAGS.epochs,
+        lmd=FLAGS.lmd,
+        optimizer=FLAGS.optimizer
+    )
+
     # initialize the model
     model = get_model()
-    run = wandb.init(project='bodyAE', reinit=True)
+    run = wandb.init(project="bodyAE", config=hyperparameter_defaults)
 
     # restore model if needed
     if FLAGS.resume_train:
