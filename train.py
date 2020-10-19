@@ -34,7 +34,6 @@ flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
 
-
 def get_inputs(batch):
     """
     Generates the inputs to the network
