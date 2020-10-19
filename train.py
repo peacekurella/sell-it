@@ -25,7 +25,6 @@ flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
-flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
@@ -33,6 +32,7 @@ flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 def get_inputs(batch):
     """

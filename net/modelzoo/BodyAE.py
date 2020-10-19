@@ -11,6 +11,10 @@ class BodyAE(nn.Module):
     """Defines the body auto encoder class"""
 
     def __init__(self, FLAGS):
+        """
+        Constructor for the class
+        :param FLAGS: abseil flags
+        """
 
         super(BodyAE, self).__init__()
         self.encoder = ConvEncoderSingle(FLAGS)
