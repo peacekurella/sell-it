@@ -22,9 +22,9 @@ from losses import *
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', '../Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', '../Data/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', '../ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
+flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
@@ -44,7 +44,7 @@ flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
@@ -157,6 +157,11 @@ def get_hyperparameters():
 
 
 def main(args):
+
+    # make sure dec hidden units and layers are same
+    FLAGS.dec_hidden_units = FLAGS.enc_hidden_units
+    FLAGS.dec_layers = FLAGS.enc_layers
+
     # initialize the dataset and the data loader
     train_dataset = HagglingDataset(FLAGS.train, FLAGS)
     train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
@@ -257,6 +262,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-    FLAGS.dec_hidden_units = FLAGS.enc_hidden_units
-    FLAGS.dec_layers = FLAGS.enc_layers
     app.run(main)
