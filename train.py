@@ -44,8 +44,8 @@ flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
-flags.DEFINE_bool('CNN', False, 'Cnn based model')
+flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_bool('CNN', True, 'Cnn based model')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
