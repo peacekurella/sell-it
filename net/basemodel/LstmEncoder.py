@@ -14,7 +14,7 @@ class LstmEncoder(nn.Module):
         super(LstmEncoder, self).__init__()
 
         # attributes
-        self.hidden_units = FLAGS.dec_hidden_units
+        self.hidden_units = FLAGS.enc_hidden_units
         self.input_dim = FLAGS.input_dim
         self.num_layers = FLAGS.enc_layers
 
@@ -24,7 +24,7 @@ class LstmEncoder(nn.Module):
             self.hidden_units,
             batch_first=True,
             num_layers=self.num_layers,
-            dropout=self.enc_dropout
+            dropout=FLAGS.enc_dropout
         )
 
         # input dropout
@@ -38,7 +38,7 @@ class LstmEncoder(nn.Module):
         """
 
         # shape should be batch_size, num_layers, number of hidden units
-        return torch.zeros((batch_size, self.num_layers, self.hidden_units))
+        return torch.zeros((self.num_layers, batch_size, self.hidden_units)).cuda()
 
     def forward(self, input):
         """
@@ -51,10 +51,9 @@ class LstmEncoder(nn.Module):
         latent = (self.init_hidden_state(input.shape[0]), self.init_hidden_state(input.shape[0]))
 
         # dropout before input to make it robust to noise
-        input = self.dropout(input)
-
-        # pass through lstm
-        _, latent = self.lstm(input, latent)
+        for t in range(input.shape[1]):
+            x= self.dropout(input[:, t])
+            _, latent = self.lstm(torch.unsqueeze(x, 1), latent)
 
         return latent
 

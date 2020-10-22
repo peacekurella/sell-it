@@ -15,9 +15,10 @@ class LstmDecoder(nn.Module):
         super(LstmDecoder, self).__init__()
 
         # attributes
-        self.hidden_units = FLAGS.enc_hidden_units
+        self.hidden_units = FLAGS.dec_hidden_units
         self.input_dim = FLAGS.input_dim
         self.output_dim = FLAGS.output_dim
+        self.num_layers = FLAGS.dec_layers
 
         # Encoder LSTM
         self.lstm = nn.LSTM(
@@ -25,7 +26,7 @@ class LstmDecoder(nn.Module):
             self.hidden_units,
             batch_first=True,
             num_layers=self.num_layers,
-            dropout=self.dec_dropout
+            dropout=FLAGS.dec_dropout
         )
 
         # input dropout
@@ -42,7 +43,7 @@ class LstmDecoder(nn.Module):
         """
 
         # shape should be batch_size, 1, number of hidden units
-        return torch.zeros((batch_size, self.num_layers, self.hidden_units))
+        return torch.zeros((self.num_layers, batch_size, self.hidden_units)).cuda()
 
     def forward(self, input, latent):
         """
@@ -54,12 +55,10 @@ class LstmDecoder(nn.Module):
         """
 
         # dropout before input to make it robust to noise
-        input = self.dropout(input)
-
-        # pass through lstm
-        output, latent = self.lstm(input, latent)
-
-        # pass through linear layer
-        output = F.relu(output)
+        for t in range(input.shape[1]):
+            x = self.dropout(input[:, t])
+            output, latent = self.lstm(torch.unsqueeze(x, 1), latent)
+            output = self.linear(output)
+            output = F.relu(output)
 
         return output, latent

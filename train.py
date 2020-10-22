@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append("net")
 sys.path.append("net/modelzoo")
 sys.path.append("net/basemodel")
@@ -14,6 +15,8 @@ from absl import flags
 from HagglingDataset import HagglingDataset
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
+from LstmBodyAE import  LstmBodyAE
+
 from losses import *
 
 FLAGS = flags.FLAGS
@@ -28,11 +31,23 @@ flags.DEFINE_integer('epochs', 150, 'Training epochs')
 flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
+flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
+flags.DEFINE_integer('dec_hidden_units', 128, 'Decoder LSTM hidden units')
+flags.DEFINE_integer('enc_layers', 1, 'encoder LSTM layers')
+flags.DEFINE_integer('dec_layers', 1, 'decoder LSTM layers')
+flags.DEFINE_float('enc_dropout', 0.25, 'encoder LSTM dropout')
+flags.DEFINE_float('dec_dropout', 0.25, 'decoder LSTM dropout')
+flags.DEFINE_float('dropout', 0.25, 'dense network dropout')
+flags.DEFINE_float('tf_ratio', 0.5, 'teacher forcing ratio')
 
+flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
+flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
+flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+
 
 def get_inputs(batch):
     """
@@ -45,16 +60,27 @@ def get_inputs(batch):
     r = batch['rightSeller']['joints21']
 
     if FLAGS.pretrain:
-        train_x = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
-        return train_x, train_y
+        if FLAGS.CNN:
+            train_x = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
+            train_y = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
+            return train_x, train_y
+        else:
+            train_x = torch.cat((l, r), dim=0).float().cuda()
+            train_y = torch.cat((l, r), dim=0).float().cuda()
+            return train_x, train_y
     else:
-        set_x_a = torch.cat((b, l), dim=2)
-        set_x_b = torch.cat((b, r), dim=2)
-        train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-        return train_x, train_y
-
+        if FLAGS.CNN:
+            set_x_a = torch.cat((b, l), dim=2)
+            set_x_b = torch.cat((b, r), dim=2)
+            train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
+            train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+            return train_x, train_y
+        else:
+            set_x_a = torch.cat((b, l), dim=2)
+            set_x_b = torch.cat((b, r), dim=2)
+            train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
+            train_y = torch.cat((r, l), dim=0).float().cuda()
+            return train_x, train_y
 
 def get_model():
     """
@@ -64,6 +90,8 @@ def get_model():
 
     if FLAGS.model == 'bodyAE':
         return BodyAE(FLAGS).cuda()
+    if FLAGS.model == 'LstmAE':
+        return LstmBodyAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
 
@@ -119,19 +147,19 @@ def main(args):
 
     # initialize the model
     model = get_model()
-    run = wandb.init(project="bodyAE", config=hyperparameter_defaults)
+    run = wandb.init(project=FLAGS.model, config=hyperparameter_defaults)
 
     # restore model if needed
     if FLAGS.resume_train:
         if FLAGS.pretrain:
-            ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'AE/')
         else:
-            ckpt = os.path.join(FLAGS.ckpt_dir, 'ME/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'ME/')
         model.load_model(ckpt, None)
 
     # restore model partially if not pretraining
     if not FLAGS.pretrain:
-        ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
+        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'AE/')
         model.load_transfer_params(ckpt, None)
 
     # get the loss function and optimizers
@@ -198,9 +226,9 @@ def main(args):
 
         if epoch % FLAGS.ckpt == 0:
             if FLAGS.pretrain:
-                ckpt = os.path.join(FLAGS.ckpt_dir, 'AE/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'AE/')
             else:
-                ckpt = os.path.join(FLAGS.ckpt_dir, 'ME/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'ME/')
             model.save_model(ckpt, epoch)
 
     run.finish()
