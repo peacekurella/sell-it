@@ -152,9 +152,9 @@ def main(args):
     # restore model if needed
     if FLAGS.resume_train:
         if FLAGS.pretrain:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'AE/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/AE/')
         else:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'ME/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/ME/')
         model.load_model(ckpt, None)
 
     # restore model partially if not pretraining
@@ -226,9 +226,9 @@ def main(args):
 
         if epoch % FLAGS.ckpt == 0:
             if FLAGS.pretrain:
-                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'AE/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/AE/')
             else:
-                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'ME/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/ME/')
             model.save_model(ckpt, epoch)
 
     run.finish()
