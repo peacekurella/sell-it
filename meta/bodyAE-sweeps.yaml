@@ -9,7 +9,7 @@ parameters:
     max: 0.001
   epochs:
     min: 50
-    max: 500
+    max: 200
   lmd:
     min: 0.0001
     max: 0.003

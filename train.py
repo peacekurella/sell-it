@@ -28,8 +28,8 @@ flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
-flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
-flags.DEFINE_float('lmd', 0.001, 'L1 Regularization factor')
+flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate')
+flags.DEFINE_float('lmd', 0.000, 'L1 Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
 flags.DEFINE_integer('dec_hidden_units', 128, 'Decoder LSTM hidden units')
@@ -47,6 +47,7 @@ flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+
 
 def get_inputs(batch):
     """
@@ -157,7 +158,6 @@ def get_hyperparameters():
 
 
 def main(args):
-
     # make sure dec hidden units and layers are same
     FLAGS.dec_hidden_units = FLAGS.enc_hidden_units
     FLAGS.dec_layers = FLAGS.enc_layers

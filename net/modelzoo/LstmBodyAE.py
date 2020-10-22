@@ -31,8 +31,11 @@ class LstmBodyAE(nn.Module):
         :return: output from the network of shape (batch_size, seq_length, 73)
         """
 
-        # check to see wether teacher forcing needs to be enabled
-        teacher_forcing = True if random.random() < self.tf_ratio else False
+        # check to see whether teacher forcing needs to be enabled
+        if self.training:
+            teacher_forcing = True if random.random() < self.tf_ratio else False
+        else:
+            teacher_forcing = False
 
         # pass through encoder
         # discard the context vector and only use hidden state

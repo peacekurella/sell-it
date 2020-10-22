@@ -10,12 +10,13 @@ from sklearn.cluster import KMeans
 
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
+from LstmBodyAE import LstmBodyAE
 from DebugVisualizer import DebugVisualizer
 from HagglingDataset import HagglingDataset
 from Quaternions import Quaternions
 from preprocess import SkeletonHandler
 
-FLGS = flags.FLAGS
+FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'Data/test/', 'Directory containing test files')
@@ -28,28 +29,52 @@ pss = lambda a, b: a == b
 
 
 def get_input(batch):
-    # construct inputs according to the model we are testing
+    """
+    Generates the inputs to the network
+    :param batch: batch for training
+    :return: train_x, train_y tensors
+    """
     b = batch['buyer']['joints21']
     l = batch['leftSeller']['joints21']
     r = batch['rightSeller']['joints21']
 
-    if FLGS.bodyae:
-        train_x = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-        return train_x, train_y
+    if FLAGS.pretrain:
+        if FLAGS.CNN:
+            train_x = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
+            train_y = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
+            return train_x, train_y
+        else:
+            train_x = torch.cat((l, r), dim=0).float().cuda()
+            train_y = torch.cat((l, r), dim=0).float().cuda()
+            return train_x, train_y
     else:
-        set_x_a = torch.cat((b, l), dim=2)
-        set_x_b = torch.cat((b, r), dim=2)
-        train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-        return train_x, train_y
+        if FLAGS.CNN:
+            set_x_a = torch.cat((b, l), dim=2)
+            set_x_b = torch.cat((b, r), dim=2)
+            train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
+            train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+            return train_x, train_y
+        else:
+            set_x_a = torch.cat((b, l), dim=2)
+            set_x_b = torch.cat((b, r), dim=2)
+            train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
+            train_y = torch.cat((r, l), dim=0).float().cuda()
+            return train_x, train_y
 
 
-def get_model(FLAGS):
-    if FLAGS.bodyae:
+def get_model():
+    """
+    Returns the appropriate model for training
+    :return: PyTorch model that extends nn.Module
+    """
+
+    if FLAGS.model == 'bodyAE':
         return BodyAE(FLAGS).cuda()
+    if FLAGS.model == 'LstmAE':
+        return LstmBodyAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
+
 
 
 def get_global_positions_denormalized(subjects, subject_params, FLAGS):
@@ -100,14 +125,14 @@ def pose_structure_score(r_target, r_prediction, l_target, l_prediction):
 
 
 def main(arg):
-    test_dataset = HagglingDataset(FLGS.test, FLGS)
+    test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, num_workers=10)
-    ckpt = FLGS.ckpt
-    output_folder = FLGS.output_dir
+    ckpt = FLAGS.ckpt
+    output_folder = FLAGS.output_dir
     # output folder for videos
     os.makedirs(output_folder, exist_ok=True)
 
-    model = get_model(FLGS)
+    model = get_model(FLAGS)
 
     model.load_model(ckpt, None)
     model.eval()
@@ -161,7 +186,7 @@ def main(arg):
 
             # convert to global form
             r_target_global, r_prediction_global, l_target_global, l_prediction_global = \
-                get_global_positions_denormalized(subjects, subject_params, FLGS)
+                get_global_positions_denormalized(subjects, subject_params, FLAGS)
 
             # get losses
             r_loss = get_subject_loss(r_target_global.copy(), r_prediction_global.copy())
