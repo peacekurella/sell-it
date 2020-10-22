@@ -15,16 +15,16 @@ from absl import flags
 from HagglingDataset import HagglingDataset
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
-from LstmBodyAE import  LstmBodyAE
+from LstmBodyAE import LstmBodyAE
 
 from losses import *
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('train', '../Data/train/', 'Directory containing train files')
+flags.DEFINE_string('test', '../Data/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', '../ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
@@ -47,6 +47,9 @@ flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+
+FLAGS.dec_hidden_units = FLAGS.enc_hidden_units
+FLAGS.dec_layers = FLAGS.enc_layers
 
 
 def get_inputs(batch):
@@ -81,6 +84,7 @@ def get_inputs(batch):
             train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
             train_y = torch.cat((r, l), dim=0).float().cuda()
             return train_x, train_y
+
 
 def get_model():
     """
@@ -129,6 +133,33 @@ def get_scheduler(optimizer):
     return torch.optim.lr_scheduler.StepLR(optimizer, 5, gamma=0.95)
 
 
+def get_hyperparameters():
+    if FLAGS.model == "bodyAE":
+        hyperparameter_defaults = dict(
+            batch_size=FLAGS.batch_size,
+            learning_rate=FLAGS.learning_rate,
+            epochs=FLAGS.epochs,
+            lmd=FLAGS.lmd,
+            optimizer=FLAGS.optimizer
+        )
+        return hyperparameter_defaults
+    else:
+        hyperparameter_defaults = dict(
+            batch_size=FLAGS.batch_size,
+            learning_rate=FLAGS.learning_rate,
+            epochs=FLAGS.epochs,
+            lmd=FLAGS.lmd,
+            optimizer=FLAGS.optimizer,
+            enc_hidden_units=FLAGS.enc_hidden_units,
+            dec_hidden_units=FLAGS.dec_hidden_units,
+            enc_layers=FLAGS.enc_layers,
+            dec_layers=FLAGS.dec_layers,
+            dropout=FLAGS.dropout,
+            tf_ratio=FLAGS.tf_ratio
+        )
+        return hyperparameter_defaults
+
+
 def main(args):
     # initialize the dataset and the data loader
     train_dataset = HagglingDataset(FLAGS.train, FLAGS)
@@ -137,29 +168,24 @@ def main(args):
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
     # get default_hyperparameters
-    hyperparameter_defaults = dict(
-        batch_size=FLAGS.batch_size,
-        learning_rate=FLAGS.learning_rate,
-        epochs=FLAGS.epochs,
-        lmd=FLAGS.lmd,
-        optimizer=FLAGS.optimizer
-    )
+    hyperparameter_defaults = get_hyperparameters()
 
     # initialize the model
     model = get_model()
+
     run = wandb.init(project=FLAGS.model, config=hyperparameter_defaults)
 
     # restore model if needed
     if FLAGS.resume_train:
         if FLAGS.pretrain:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/AE/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/AE/')
         else:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/ME/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/ME/')
         model.load_model(ckpt, None)
 
     # restore model partially if not pretraining
     if not FLAGS.pretrain:
-        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'AE/')
+        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + 'AE/')
         model.load_transfer_params(ckpt, None)
 
     # get the loss function and optimizers
@@ -226,9 +252,9 @@ def main(args):
 
         if epoch % FLAGS.ckpt == 0:
             if FLAGS.pretrain:
-                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/AE/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/AE/')
             else:
-                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model+'/ME/')
+                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/ME/')
             model.save_model(ckpt, epoch)
 
     run.finish()
