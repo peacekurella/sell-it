@@ -59,6 +59,6 @@ class LstmDecoder(nn.Module):
             x = self.dropout(input[:, t])
             output, latent = self.lstm(torch.unsqueeze(x, 1), latent)
             output = self.linear(output)
-            output = F.relu(output)
+            output = torch.tanh(output)
 
         return output, latent

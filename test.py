@@ -19,15 +19,15 @@ from preprocess import SkeletonHandler
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('test', '../Data/train/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', '../Data/output/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', '../ckpt/LstmAE/AE', 'file containing the model weights')
-flags.DEFINE_float('lmd', 0.1, 'L1 Regularization factor')
+flags.DEFINE_string('test', 'Data/train/', 'Directory containing test files')
+flags.DEFINE_string('output_dir', 'Data/LstmAEoutput/', 'Folder to store final videos')
+flags.DEFINE_string('ckpt', 'ckpt/LstmAE/AE', 'file containing the model weights')
+flags.DEFINE_float('lmd', 0.0, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
-flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
-flags.DEFINE_integer('dec_hidden_units', 128, 'Decoder LSTM hidden units')
+flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder LSTM hidden units')
+flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder LSTM hidden units')
 flags.DEFINE_integer('enc_layers', 1, 'encoder LSTM layers')
 flags.DEFINE_integer('dec_layers', 1, 'decoder LSTM layers')
 flags.DEFINE_float('enc_dropout', 0.25, 'encoder LSTM dropout')
@@ -148,7 +148,7 @@ def main(arg):
 
     model = get_model()
 
-    model.load_model(ckpt, 30)
+    model.load_model(ckpt, None)
     model.eval()
 
     skeletonHandler = SkeletonHandler()
@@ -170,7 +170,7 @@ def main(arg):
             # get loss
             # loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
             # test_loss += loss
-            if FLAGS.model != "LstmAE":
+            if FLAGS.CNN:
                 targets = targets.permute(0, 2, 1)
                 predictions = predictions.permute(0, 2, 1)
 
