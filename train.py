@@ -16,15 +16,16 @@ from HagglingDataset import HagglingDataset
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
 from LstmBodyAE import LstmBodyAE
+from ConvMotionTransformVAE import ConvMotionTransformVAE
 
 from losses import *
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('train', '../Data/train/', 'Directory containing train files')
+flags.DEFINE_string('test', '../Data/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', '../ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
@@ -39,6 +40,8 @@ flags.DEFINE_float('enc_dropout', 0.25, 'encoder LSTM dropout')
 flags.DEFINE_float('dec_dropout', 0.25, 'decoder LSTM dropout')
 flags.DEFINE_float('dropout', 0.25, 'dense network dropout')
 flags.DEFINE_float('tf_ratio', 0.3, 'teacher forcing ratio')
+flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
+flags.DEFINE_integer('latent_dim', 128, 'latent dimension')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
@@ -46,6 +49,7 @@ flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
+flags.DEFINE_bool('VAE', False, 'VAE training')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
@@ -93,6 +97,8 @@ def get_model():
         return BodyAE(FLAGS).cuda()
     if FLAGS.model == 'LstmAE':
         return LstmBodyAE(FLAGS).cuda()
+    if FLAGS.model == 'MTVAE':
+        return ConvMotionTransformVAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
 
@@ -102,8 +108,10 @@ def get_loss_fn():
     Returns the appropriate loss function for training
     :return: loss function
     """
-
-    return reconstruction_l1
+    if FLAGS.VAE:
+        return reconstruction_VAE
+    else:
+        return reconstruction_l1
 
 
 def get_optimizer(parameters):
@@ -201,6 +209,8 @@ def main(args):
 
         # initialize the total epoch loss values
         epoch_train_loss = 0.0
+        epoch_train_rec_loss = 0.0
+        epoch_train_reg_loss = 0.0
         epoch_val_loss = 0.0
 
         # set model to train mode
@@ -216,15 +226,20 @@ def main(args):
             data, targets = get_inputs(batch)
 
             # forward pass through the network
+            if FLAGS.VAE:
+                data = (data, targets)
             predictions = model(data)
 
             # calculate loss
-            batch_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
-            epoch_train_loss += batch_loss
+            total_loss, rec_loss, reg_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
+
+            epoch_train_loss += total_loss
+            epoch_train_rec_loss += rec_loss
+            epoch_train_reg_loss += reg_loss
             count_train += 1
 
             # calculate gradients
-            batch_loss.backward()
+            total_loss.backward()
             optimizer.step()
 
         # set the model to evaluation mode
@@ -247,7 +262,9 @@ def main(args):
 
         # log the metrics
         wandb.log({
-            'train_loss': epoch_train_loss / count_train,
+            'train_total_loss': epoch_train_loss / count_train,
+            'train_rec_loss': epoch_train_rec_loss / count_train,
+            'train_reg_loss': epoch_train_reg_loss / count_train,
             'val_loss': epoch_val_loss / count_test
         })
 

@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 
@@ -25,3 +26,12 @@ class ConvEncoderSingle(nn.Module):
         :return: Output of the encoder (batch_size, f/2, 256)
         """
         return self.network(x)
+
+    def get_output_dimensions(self, FLAGS):
+        """
+        Return the output dimensions of the model for transformation
+        :param FLAGS: abseil flags
+        :return output dimension shape
+        """
+        x = torch.rand((FLAGS.batch_size, FLAGS.input_dim, FLAGS.seq_length))
+        return self.network(x).shape

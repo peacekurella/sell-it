@@ -19,9 +19,10 @@ def reconstruction_l1(predictions, targets, model_params, lmd):
     mse = criterion1(predictions, targets)
     l1_loss = 0
     for param in model_params:
-        l1_loss +=  torch.norm(param, 1)
+        l1_loss += torch.norm(param, 1)
 
-    return mse + (lmd * l1_loss)
+    return mse + (lmd * l1_loss), mse, lmd * l1_loss
+
 
 def meanJointPoseError(predictions, targets):
     """
@@ -32,4 +33,25 @@ def meanJointPoseError(predictions, targets):
     """
 
     loss = nn.MSELoss(reduction='mean')
-    return  loss(predictions, targets)
+    return loss(predictions, targets)
+
+
+def reconstruction_VAE(predictions, target):
+    """
+    Defines the reconstruction and KL divergence loss for VAE
+    :param predictions: prediction from model including mean and log_var
+    :param target: ground truths
+    :return: mean loss for the entire batch
+    """
+    predictions, mu, log_var = predictions
+
+    # set the criterion objects for mse
+    criterion1 = nn.MSELoss(reduction='mean')
+
+    # calculate the reconstruction loss
+    loss_mse = criterion1(predictions, target)
+
+    # calculate the KL Divergence loss
+    loss_kld = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
+
+    return loss_mse + loss_kld, loss_mse, loss_kld
