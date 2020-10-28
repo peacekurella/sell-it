@@ -36,7 +36,7 @@ def meanJointPoseError(predictions, targets):
     return loss(predictions, targets)
 
 
-def reconstruction_VAE(predictions, target):
+def reconstruction_VAE(predictions, target, model_params, lmd):
     """
     Defines the reconstruction and KL divergence loss for VAE
     :param predictions: prediction from model including mean and log_var
@@ -54,4 +54,4 @@ def reconstruction_VAE(predictions, target):
     # calculate the KL Divergence loss
     loss_kld = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
 
-    return loss_mse + loss_kld, loss_mse, loss_kld
+    return loss_mse + 1e-3*loss_kld, loss_mse, loss_kld

@@ -45,11 +45,12 @@ flags.DEFINE_integer('latent_dim', 128, 'latent dimension')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
-flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
+flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "LstmAE", 'Defines the name of the model')
-flags.DEFINE_bool('CNN', False, 'Cnn based model')
-flags.DEFINE_bool('VAE', False, 'VAE training')
+flags.DEFINE_string('model', "MTVAE", 'Defines the name of the model')
+flags.DEFINE_bool('CNN', True, 'Cnn based model')
+flags.DEFINE_bool('VAE', True, 'VAE training')
+flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
@@ -194,7 +195,7 @@ def main(args):
 
     # restore model partially if not pretraining
     if not FLAGS.pretrain:
-        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + 'AE/')
+        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.pretrainedModel + '/AE/')
         model.load_transfer_params(ckpt, None)
 
     # get the loss function and optimizers
@@ -253,6 +254,8 @@ def main(args):
                 data, targets = get_inputs(batch)
 
                 # forward pass through the network
+                if FLAGS.VAE:
+                    data = (data, targets)
                 predictions = model(data)
 
                 # calculate loss
@@ -261,6 +264,11 @@ def main(args):
                 count_test += 1
 
         # log the metrics
+        losses = {'train_total_loss': epoch_train_loss / count_train,
+                  'train_rec_loss': epoch_train_rec_loss / count_train,
+                  'train_reg_loss': epoch_train_reg_loss / count_train,
+                  'val_loss': epoch_val_loss / count_test}
+        print(losses)
         wandb.log({
             'train_total_loss': epoch_train_loss / count_train,
             'train_rec_loss': epoch_train_rec_loss / count_train,
