@@ -41,7 +41,7 @@ class LstmBodyAE(nn.Module):
         # discard the context vector and only use hidden state
         latent = self.encoder(input)
         h, c = latent
-        #c = torch.zeros(h.shape).cuda()
+        # c = torch.zeros(h.shape).cuda()
         latent = (h, c)
 
         # if teacher forcing the network
@@ -119,7 +119,7 @@ class LstmBodyAE(nn.Module):
             enc_path = enc_path + str(epoch) + '.ckpt'
             dec_path = dec_path + str(epoch) + '.ckpt'
         else:
-            enc_path = max(glob.glob(enc_path+'*'), key=os.path.getctime)
+            enc_path = max(glob.glob(enc_path + '*'), key=os.path.getctime)
             dec_path = max(glob.glob(dec_path + '*'), key=os.path.getctime)
 
         # try to load the models

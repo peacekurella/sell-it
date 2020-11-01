@@ -12,7 +12,7 @@ class Resnet(nn.Module):
 
     def forward(self, x):
         """forward pass to produce transformation into latent dimension"""
-        x_mean = torch.tanh(self.mean(x))
+        x_mean = torch.relu(self.mean(x))
         x_std = torch.relu(self.std(x)) + 1e-6
 
         return x_mean, x_std

@@ -23,9 +23,9 @@ from losses import *
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', '../Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', '../Data/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', '../ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
+flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 150, 'Training epochs')
@@ -203,7 +203,7 @@ def main(args):
     optimizer = get_optimizer(model.get_trainable_parameters())
 
     # start watching the model for gradient info
-    wandb.watch(model)
+    #wandb.watch(model)
 
     # run the training script
     for epoch in range(1, FLAGS.epochs + 1):
@@ -234,14 +234,17 @@ def main(args):
             # calculate loss
             total_loss, rec_loss, reg_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
 
-            epoch_train_loss += total_loss
-            epoch_train_rec_loss += rec_loss
-            epoch_train_reg_loss += reg_loss
+            epoch_train_loss += total_loss.detach().item()
+            epoch_train_rec_loss += rec_loss.detach().item()
+            del rec_loss
+            epoch_train_reg_loss += reg_loss.detach().item()
+            del reg_loss
             count_train += 1
 
             # calculate gradients
             total_loss.backward()
             optimizer.step()
+            del total_loss
 
         # set the model to evaluation mode
         model.eval()
@@ -260,7 +263,8 @@ def main(args):
 
                 # calculate loss
                 val_loss = meanJointPoseError(predictions, targets)
-                epoch_val_loss += val_loss
+                epoch_val_loss += val_loss.detach().item()
+                del val_loss
                 count_test += 1
 
         # log the metrics

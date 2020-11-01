@@ -19,7 +19,7 @@ class BodyMotionGenerator(nn.Module):
     def forward(self, x):
         """
         Defines a forward pass through the Body Auto Encoder
-        :param x: Input vector of shape (batch_size, f, 73)
+        :param x: Input vector of shape (batch_size, f, 146)
         :return: output vector of shape (batch_size, f, 73)
         """
 

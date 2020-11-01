@@ -43,6 +43,7 @@ def reconstruction_VAE(predictions, target, model_params, lmd):
     :param target: ground truths
     :return: mean loss for the entire batch
     """
+    del model_params, lmd
     predictions, mu, log_var = predictions
 
     # set the criterion objects for mse
