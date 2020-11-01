@@ -43,7 +43,9 @@ def reconstruction_VAE(predictions, target, model_params, lmd):
     :param target: ground truths
     :return: mean loss for the entire batch
     """
+    # delete model params and lmd
     del model_params, lmd
+
     predictions, mu, log_var = predictions
 
     # set the criterion objects for mse
@@ -55,4 +57,4 @@ def reconstruction_VAE(predictions, target, model_params, lmd):
     # calculate the KL Divergence loss
     loss_kld = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
 
-    return loss_mse + 1e-3*loss_kld, loss_mse, loss_kld
+    return loss_mse + lmd*loss_kld, loss_mse, loss_kld

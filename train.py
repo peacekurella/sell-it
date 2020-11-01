@@ -239,6 +239,7 @@ def main(args):
             del rec_loss
             epoch_train_reg_loss += reg_loss.detach().item()
             del reg_loss
+            epoch_train_reg_loss += reg_loss.detach().item()
             count_train += 1
 
             # calculate gradients

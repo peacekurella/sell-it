@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
+from ConvMotionTransformVAE import ConvMotionTransformVAE
 from LstmBodyAE import LstmBodyAE
 from DebugVisualizer import DebugVisualizer
 from HagglingDataset import HagglingDataset
@@ -21,12 +22,10 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', '../Data/train/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', '../Data/boyAEoutput/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', '../ckpt/bodyAE/AE', 'file containing the model weights')
+flags.DEFINE_string('output_dir', '../Data/MTVAEoutput/', 'Folder to store final videos')
+flags.DEFINE_string('ckpt', '../ckpt/MTVAE/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.1, 'L1 Regularization factor')
-flags.DEFINE_boolean('bodyae', True, 'if True checks BodyAE model')
-flags.DEFINE_bool('CNN', True, 'Cnn based model')
-flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
 flags.DEFINE_integer('dec_hidden_units', 128, 'Decoder LSTM hidden units')
 flags.DEFINE_integer('enc_layers', 1, 'encoder LSTM layers')
@@ -35,10 +34,18 @@ flags.DEFINE_float('enc_dropout', 0.25, 'encoder LSTM dropout')
 flags.DEFINE_float('dec_dropout', 0.25, 'decoder LSTM dropout')
 flags.DEFINE_float('dropout', 0.25, 'dense network dropout')
 flags.DEFINE_float('tf_ratio', 0.5, 'teacher forcing ratio')
-flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
+flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
+flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
+flags.DEFINE_integer('latent_dim', 128, 'latent dimension')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
+flags.DEFINE_string('model', "MTVAE", 'Defines the name of the model')
+flags.DEFINE_bool('CNN', True, 'Cnn based model')
+flags.DEFINE_bool('VAE', True, 'VAE training')
+flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
+flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
+flags.DEFINE_integer('num_saves', 20, 'number of outputs to save')
 
 pss = lambda a, b: a == b
 
@@ -87,6 +94,8 @@ def get_model():
         return BodyAE(FLAGS).cuda()
     if FLAGS.model == 'LstmAE':
         return LstmBodyAE(FLAGS).cuda()
+    if FLAGS.model == 'MTVAE':
+        return ConvMotionTransformVAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
 
@@ -148,8 +157,10 @@ def main(arg):
 
     model = get_model()
 
-    model.load_model(ckpt, 50)
+    model.load_model(ckpt, None)
     model.eval()
+
+    num_saves = 0
 
     skeletonHandler = SkeletonHandler()
     # for storing loss values and pss values
@@ -157,114 +168,139 @@ def main(arg):
 
     pss_eval = {'rightSeller': [], 'leftSeller': []}
 
+    save_files = False
+
     with torch.no_grad():
 
         for i_batch, batch in enumerate(test_dataloader):
 
-            # get test input and labels
-            data, targets = get_input(batch)
+            if 0.4 < random.random() < 0.5 and num_saves < FLAGS.num_saves:
+                save_files = True
+                num_saves += 1
 
-            # forward pass through the network
-            predictions = model(data)
+            batch_runs = 1
 
-            # get loss
-            # loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
-            # test_loss += loss
-            if FLAGS.CNN:
-                targets = targets.permute(0, 2, 1)
-                predictions = predictions.permute(0, 2, 1)
+            if FLAGS.VAE:
+                batch_runs = FLAGS.batch_runs
 
-            # separate right and left seller
-            r_target = targets[0].cpu().numpy()
-            r_prediction = predictions[0].cpu().numpy()
-            l_target = targets[1].cpu().numpy()
-            l_prediction = predictions[1].cpu().numpy()
+            run_pss_eval = {'rightSeller': [], 'leftSeller': []}
 
-            # get PSS evaluation score for the batch
-            rpss, lpss = pose_structure_score(r_target.copy().astype(float), r_prediction.copy().astype(float),
-                                              l_target.copy().astype(float), l_prediction.copy().astype(float))
-            pss_eval['rightSeller'].append(rpss)
-            pss_eval['leftSeller'].append(lpss)
-            print(rpss, lpss)
+            run_loss_eval = {'rightSeller': [], 'leftSeller': []}
 
-            subjects = [r_target.copy(), r_prediction.copy(), l_target.copy(),
-                        l_prediction.copy()]
+            for r in range(0, batch_runs):
 
-            # get initRot and initTrans
-            initRotRightSeller = Quaternions.from_euler(batch['rightSeller']['initRot'][0].cpu().numpy())
-            initTransRightSeller = np.array(batch['rightSeller']['initTrans'][0].cpu().numpy())
-            initRotLeftSeller = Quaternions.from_euler(batch['leftSeller']['initRot'][0].cpu().numpy())
-            initTransLeftSeller = np.array(batch['leftSeller']['initTrans'][0].cpu().numpy())
+                # get test input and labels
+                data, targets = get_input(batch)
 
-            subject_params = [initRotRightSeller, initTransRightSeller, initRotLeftSeller, initTransLeftSeller]
+                # forward pass through the network
+                if FLAGS.VAE:
+                    data = (data, targets)
+                predictions = model(data)
 
-            # convert to global form
-            r_target_global, r_prediction_global, l_target_global, l_prediction_global = \
-                get_global_positions_denormalized(subjects, subject_params, FLAGS)
+                # get loss
+                # loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
+                # test_loss += loss
+                if FLAGS.CNN:
+                    targets = targets.permute(0, 2, 1)
+                    predictions = predictions.permute(0, 2, 1)
 
-            # get losses and take square root of mse
-            r_loss = get_subject_loss(r_target_global.copy(), r_prediction_global.copy())
-            r_loss = torch.sqrt(r_loss)
-            loss_dict['rightSeller'].append(r_loss)
-            l_loss = get_subject_loss(l_target_global.copy(), l_prediction_global.copy())
-            l_loss = torch.sqrt(l_loss)
-            print(l_loss)
-            print(r_loss)
-            loss_dict['leftSeller'].append(l_loss)
+                # separate right and left seller
+                r_target = targets[0].cpu().numpy()
+                r_prediction = predictions[0].cpu().numpy()
+                l_target = targets[1].cpu().numpy()
+                l_prediction = predictions[1].cpu().numpy()
 
-            # pick random videos to save
-            if 0.4 < random.random() < 0.6:
-                # prepare skeletons to write in the video
-                skel1 = []
-                skel2 = []
-                vis1 = DebugVisualizer()
-                vis2 = DebugVisualizer()
-                # create skeletons
-                for key in batch.keys():
-                    if key == 'rightSeller':
-                        x = vis1.conv_debug_visual_form(r_target_global)
-                        skel1.append(x)
-                    elif key == 'leftSeller':
-                        x = vis1.conv_debug_visual_form(l_target_global)
-                        skel1.append(x)
-                    else:
-                        x = batch[key]['joints21'].cpu().numpy()[0]
-                        x = test_dataset.denormalize_data(x)
-                        initRot = Quaternions.from_euler(batch[key]['initRot'][0].cpu().numpy())
-                        initTrans = np.array(batch[key]['initTrans'][0].cpu().numpy())
-                        x = skeletonHandler.recover_global_positions(x, initRot, initTrans)
-                        x = vis1.conv_debug_visual_form(x)
-                        skel1.append(x)
+                # get PSS evaluation score for the batch
+                rpss, lpss = pose_structure_score(r_target.copy().astype(float), r_prediction.copy().astype(float),
+                                                  l_target.copy().astype(float), l_prediction.copy().astype(float))
+                run_pss_eval['rightSeller'].append(rpss)
+                run_pss_eval['leftSeller'].append(lpss)
+                print(rpss, lpss)
 
-                x = vis1.conv_debug_visual_form(r_prediction_global)
-                skel1.append(x)
+                subjects = [r_target.copy(), r_prediction.copy(), l_target.copy(),
+                            l_prediction.copy()]
 
-                for key in batch.keys():
-                    if key == 'leftSeller':
-                        x = vis2.conv_debug_visual_form(l_target_global)
-                        skel2.append(x)
-                    elif key == 'rightSeller':
-                        x = vis2.conv_debug_visual_form(r_target_global)
-                        skel2.append(x)
-                    else:
-                        x = batch[key]['joints21'].cpu().numpy()[0]
-                        x = test_dataset.denormalize_data(x)
-                        initRot = Quaternions.from_euler(batch[key]['initRot'][0].cpu().numpy())
-                        initTrans = np.array(batch[key]['initTrans'][0].cpu().numpy())
-                        x = skeletonHandler.recover_global_positions(x, initRot, initTrans)
-                        x = vis2.conv_debug_visual_form(x)
-                        skel2.append(x)
+                # get initRot and initTrans
+                initRotRightSeller = Quaternions.from_euler(batch['rightSeller']['initRot'][0].cpu().numpy())
+                initTransRightSeller = np.array(batch['rightSeller']['initTrans'][0].cpu().numpy())
+                initRotLeftSeller = Quaternions.from_euler(batch['leftSeller']['initRot'][0].cpu().numpy())
+                initTransLeftSeller = np.array(batch['leftSeller']['initTrans'][0].cpu().numpy())
 
-                x = vis2.conv_debug_visual_form(l_prediction_global)
-                skel2.append(x)
+                subject_params = [initRotRightSeller, initTransRightSeller, initRotLeftSeller, initTransLeftSeller]
 
-                # save random videos
-                file_location = output_folder + str(i_batch)
-                os.makedirs(file_location, exist_ok=True)
-                vis1.create_animation(skel1, file_location + '/testRight')
-                file_location = output_folder + str(i_batch)
-                os.makedirs(file_location, exist_ok=True)
-                vis2.create_animation(skel2, file_location + '/testLeft')
+                # convert to global form
+                r_target_global, r_prediction_global, l_target_global, l_prediction_global = \
+                    get_global_positions_denormalized(subjects, subject_params, FLAGS)
+
+                # get losses and take square root of mse
+                r_loss = get_subject_loss(r_target_global.copy(), r_prediction_global.copy())
+                r_loss = torch.sqrt(r_loss)
+                run_loss_eval['rightSeller'].append(r_loss)
+                l_loss = get_subject_loss(l_target_global.copy(), l_prediction_global.copy())
+                l_loss = torch.sqrt(l_loss)
+                print(l_loss)
+                print(r_loss)
+                run_loss_eval['leftSeller'].append(l_loss)
+
+                # pick random videos to save
+                if save_files:
+                    # prepare skeletons to write in the video
+                    skel1 = []
+                    skel2 = []
+                    vis1 = DebugVisualizer()
+                    vis2 = DebugVisualizer()
+                    # create skeletons
+                    for key in batch.keys():
+                        if key == 'rightSeller':
+                            x = vis1.conv_debug_visual_form(r_target_global)
+                            skel1.append(x)
+                        elif key == 'leftSeller':
+                            x = vis1.conv_debug_visual_form(l_target_global)
+                            skel1.append(x)
+                        else:
+                            x = batch[key]['joints21'].cpu().numpy()[0]
+                            x = test_dataset.denormalize_data(x)
+                            initRot = Quaternions.from_euler(batch[key]['initRot'][0].cpu().numpy())
+                            initTrans = np.array(batch[key]['initTrans'][0].cpu().numpy())
+                            x = skeletonHandler.recover_global_positions(x, initRot, initTrans)
+                            x = vis1.conv_debug_visual_form(x)
+                            skel1.append(x)
+
+                    x = vis1.conv_debug_visual_form(r_prediction_global)
+                    skel1.append(x)
+
+                    for key in batch.keys():
+                        if key == 'leftSeller':
+                            x = vis2.conv_debug_visual_form(l_target_global)
+                            skel2.append(x)
+                        elif key == 'rightSeller':
+                            x = vis2.conv_debug_visual_form(r_target_global)
+                            skel2.append(x)
+                        else:
+                            x = batch[key]['joints21'].cpu().numpy()[0]
+                            x = test_dataset.denormalize_data(x)
+                            initRot = Quaternions.from_euler(batch[key]['initRot'][0].cpu().numpy())
+                            initTrans = np.array(batch[key]['initTrans'][0].cpu().numpy())
+                            x = skeletonHandler.recover_global_positions(x, initRot, initTrans)
+                            x = vis2.conv_debug_visual_form(x)
+                            skel2.append(x)
+
+                    x = vis2.conv_debug_visual_form(l_prediction_global)
+                    skel2.append(x)
+
+                    # save random videos
+                    file_location = output_folder + str(i_batch) + '_' + str(r)
+                    os.makedirs(file_location, exist_ok=True)
+                    vis1.create_animation(skel1, file_location + '/testRight')
+                    file_location = output_folder + str(i_batch) + '_' + str(r)
+                    os.makedirs(file_location, exist_ok=True)
+                    vis2.create_animation(skel2, file_location + '/testLeft')
+
+            pss_eval['rightSeller'].append(min(run_pss_eval['rightSeller']))
+            pss_eval['leftSeller'].append(min(run_pss_eval['leftSeller']))
+            loss_dict['rightSeller'].append(min(run_loss_eval['rightSeller']))
+            loss_dict['leftSeller'].append(min(run_loss_eval['leftSeller']))
+            save_files = False
 
         rPss = sum(pss_eval['rightSeller']) / len(pss_eval['rightSeller'])
         lPss = sum(pss_eval['leftSeller']) / len(pss_eval['leftSeller'])
