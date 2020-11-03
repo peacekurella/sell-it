@@ -77,9 +77,17 @@ class ConvMotionTransformVAE(nn.Module):
         t_star = torch.reshape(t_star, ea.shape)
         eb_star = t_star + ea
 
+        if self.training:
+            eb = eb_star
+            t = eb - ea
+            t = torch.reshape(t, (t.shape[0], -1))
+            # reparametrize for VAE
+            mu_s, log_var_s = self.resnet_enc(t)
+            z_star = self.reparameterize(mu_s, log_var_s)
+
         output = self.decoder(eb_star)
         if self.training:
-            return output, mu, log_var
+            return output, mu, log_var, z, z_star
         else:
             return output
 
