@@ -1,3 +1,10 @@
+import sys
+
+sys.path.append("net")
+sys.path.append("net/modelzoo")
+sys.path.append("net/basemodel")
+sys.path.append("motion")
+
 import os
 import numpy as np
 import torch
@@ -21,9 +28,9 @@ from preprocess import SkeletonHandler
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('test', '../Data/train/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', '../Data/MTVAEoutput/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', '../ckpt/MTVAE/ME', 'file containing the model weights')
+flags.DEFINE_string('test', 'Data/train/', 'Directory containing test files')
+flags.DEFINE_string('output_dir', 'Data/MTVAEoutput/', 'Folder to store final videos')
+flags.DEFINE_string('ckpt', 'ckpt/MTVAE/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.1, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
