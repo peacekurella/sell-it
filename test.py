@@ -14,7 +14,6 @@ from absl import app
 from absl import flags
 from joblib import load
 from torch.utils.data import DataLoader
-from sklearn.cluster import KMeans
 
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
