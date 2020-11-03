@@ -211,22 +211,22 @@ class ConvMotionTransformVAE(nn.Module):
 
         # create the encoder and decoder paths
         dec_path = os.path.join(path, 'decoder/')
-        enc_path = os.path.join(path, 'encoder/')
+        # enc_path = os.path.join(path, 'encoder/')
 
         # check if epoch number is passed
         if epoch is not None:
             dec_path = dec_path + str(epoch) + '.ckpt'
-            enc_path = enc_path + str(epoch) + '.ckpt'
+            # enc_path = enc_path + str(epoch) + '.ckpt'
         else:
             dec_path = max(glob.glob(dec_path + '*'), key=os.path.getctime)
-            enc_path = max(glob.glob(enc_path + '*'), key=os.path.getctime)
+            # enc_path = max(glob.glob(enc_path + '*'), key=os.path.getctime)
 
         # try to load the models
         # noinspection PyBroadException
         try:
-            self.encoder_b.load_state_dict(torch.load(enc_path))
-            self.encoder_s1.load_state_dict(torch.load(enc_path))
-            self.encoder_s2.load_state_dict(torch.load(enc_path))
+            # self.encoder_b.load_state_dict(torch.load(enc_path))
+            # self.encoder_s1.load_state_dict(torch.load(enc_path))
+            # self.encoder_s2.load_state_dict(torch.load(enc_path))
             self.decoder.load_state_dict(torch.load(dec_path))
             print("Transfer load successful!")
         except:
