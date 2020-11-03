@@ -33,5 +33,5 @@ class ConvEncoderSingle(nn.Module):
         :param FLAGS: abseil flags
         :return output dimension shape
         """
-        x = torch.rand((FLAGS.batch_size, FLAGS.input_dim, FLAGS.seq_length))
+        x = torch.rand((1, FLAGS.input_dim, FLAGS.seq_length))
         return self.network(x).shape
