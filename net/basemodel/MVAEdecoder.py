@@ -15,7 +15,8 @@ class MVAEdecoder(nn.Module):
         self.layers = nn.ModuleList([
             nn.Linear((FLAGS.input_dim * 3) + FLAGS.latent_dim, 256),
             nn.Linear(256 + FLAGS.latent_dim, 256),
-            nn.Linear(256 + FLAGS.latent_dim, FLAGS.output_dim)
+            nn.Linear(256 + FLAGS.latent_dim, 256),
+            nn.Linear(256, FLAGS.output_dim)
         ])
 
         self.activation = nn.ELU()
