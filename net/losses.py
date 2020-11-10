@@ -82,6 +82,6 @@ def sequential_reconstruction_VAE(predictions, target, model_params, lmd):
     loss_mse = criterion1(predictions, target)
 
     # calculate the KL Divergence loss
-    loss_kld = torch.mean(torch.sum(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
+    loss_kld = torch.sum(torch.sum(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
 
     return loss_mse + ( lmd * loss_kld )
