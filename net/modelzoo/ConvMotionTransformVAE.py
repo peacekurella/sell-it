@@ -1,18 +1,11 @@
 import os
 import torch
-import torch.nn as nn
-import random
 import glob
 import torch.nn as nn
 
 from ConvDecoderSingle import ConvDecoderSingle
 from ConvEncoderSingle import ConvEncoderSingle
 from LatentPatameterizer import LatentPatameterizer
-
-from torch.distributions import normal
-
-from absl import app
-from absl import flags
 
 
 class ConvMotionTransformVAE(nn.Module):
