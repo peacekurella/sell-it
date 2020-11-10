@@ -60,6 +60,7 @@ class CharControlMotionVAE(nn.Module):
             else:
                 inp = torch.cat([b[:, t, :], s1[:, t, :], pred[-1], s2[:, t, :]], dim=1)
 
+
             mu, log_var = self.encoder(inp)
             mus.append(torch.unsqueeze(mu, dim=1))
             log_vars.append(torch.unsqueeze(log_var, dim=1))
@@ -158,7 +159,7 @@ class CharControlMotionVAE(nn.Module):
         loads transferable parameteres from other models
         :param path: directory for saved model
         :param epoch: epoch number
-        :return: load succesful or not in bool
+        :return: load successful or not in bool
         """
 
         return True

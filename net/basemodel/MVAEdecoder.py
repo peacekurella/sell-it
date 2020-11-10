@@ -32,6 +32,5 @@ class MVAEdecoder(nn.Module):
         for layer in self.layers[:-1]:
             x = layer(torch.cat([x, z], dim=1))
             x = self.activation(x)
-            print(x.shape)
 
-        return self.layers[-1](torch.cat([x, z], dim=1))
+        return self.layers[-1](x)
