@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from ConvDecoderSingle import ConvDecoderSingle
 from ConvEncoderSingle import ConvEncoderSingle
-from Resnet import Resnet
+from LatentPatameterizer import LatentPatameterizer
 
 from torch.distributions import normal
 
@@ -28,7 +28,7 @@ class ConvMotionTransformVAE(nn.Module):
 
         self.encoder_output_dimensions = self.encoder_b.get_output_dimensions(FLAGS)
         self.resnet_input_dim = self.encoder_output_dimensions[1] * self.encoder_output_dimensions[2]
-        self.resnet_enc = Resnet(self.resnet_input_dim, FLAGS.latent_dim)
+        self.resnet_enc = LatentPatameterizer(self.resnet_input_dim, FLAGS.latent_dim)
         self.latent_dim = FLAGS.latent_dim
 
         self.decoder = ConvDecoderSingle(FLAGS)
