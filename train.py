@@ -17,6 +17,7 @@ from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
 from LstmBodyAE import LstmBodyAE
 from ConvMotionTransformVAE import ConvMotionTransformVAE
+from CharControlMotionVAE import CharControlMotionVAE
 
 from losses import *
 
@@ -42,13 +43,15 @@ flags.DEFINE_float('dropout', 0.25, 'dense network dropout')
 flags.DEFINE_float('tf_ratio', 0.3, 'teacher forcing ratio')
 flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
+flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
+flags.DEFINE_float('end_scheduled_sampling', 0.6, 'when to stop scheduled sampling')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
 flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "MTVAE", 'Defines the name of the model')
-flags.DEFINE_bool('CNN', True, 'Cnn based model')
+flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
+flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
@@ -100,6 +103,8 @@ def get_model():
         return LstmBodyAE(FLAGS).cuda()
     if FLAGS.model == 'MTVAE':
         return ConvMotionTransformVAE(FLAGS).cuda()
+    if FLAGS.model == 'MVAE':
+        return CharControlMotionVAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
 
@@ -110,7 +115,10 @@ def get_loss_fn():
     :return: loss function
     """
     if FLAGS.VAE:
-        return reconstruction_VAE
+        if FLAGS.model == "MTVAE":
+            return reconstruction_VAE
+        else:
+            return sequential_reconstruction_VAE
     else:
         return reconstruction_l1
 
@@ -137,6 +145,20 @@ def get_scheduler(optimizer):
     """
 
     return torch.optim.lr_scheduler.StepLR(optimizer, 5, gamma=0.95)
+
+
+def decay_p(p, epoch):
+    """
+    Returns the current value of p according to the progress in training
+    :param p : degree of teacher forcing
+    :param epoch: current epoch
+    """
+    if FLAGS.start_scheduled_sampling < epoch / FLAGS.epochs < FLAGS.end_scheduled_sampling:
+        p = p * 0.95
+    elif epoch / FLAGS.epochs > FLAGS.end_scheduled_sampling:
+        p = 0
+
+    return p
 
 
 def get_hyperparameters():
@@ -202,8 +224,10 @@ def main(args):
     criterion = get_loss_fn()
     optimizer = get_optimizer(model.get_trainable_parameters())
 
+    p = 1.0
+
     # start watching the model for gradient info
-    #wandb.watch(model)
+    # wandb.watch(model)
 
     # run the training script
     for epoch in range(1, FLAGS.epochs + 1):
@@ -219,6 +243,8 @@ def main(args):
 
         #  calculate training loss, update params
         count_train = 0
+
+        decay_p(p, epoch)
         for i_batch, batch in enumerate(train_dataloader):
             # zero prev gradients
             optimizer.zero_grad()
@@ -229,7 +255,9 @@ def main(args):
             # forward pass through the network
             if FLAGS.VAE:
                 data = (data, targets)
-            predictions = model(data)
+                predictions = model(data, p)
+            else:
+                predictions = model(data)
 
             # calculate loss
             total_loss, rec_loss, reg_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)

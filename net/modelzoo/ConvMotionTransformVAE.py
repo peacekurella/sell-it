@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from ConvDecoderSingle import ConvDecoderSingle
 from ConvEncoderSingle import ConvEncoderSingle
-from LatentPatameterizer import LatentPatameterizer
+from LatentParameterizer import LatentPatameterizer
 
 
 class ConvMotionTransformVAE(nn.Module):
