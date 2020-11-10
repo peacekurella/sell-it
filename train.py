@@ -287,7 +287,9 @@ def main(args):
                 # forward pass through the network
                 if FLAGS.VAE:
                     data = (data, targets)
-                predictions = model(data)
+                    predictions = model(data, p)
+                else:
+                    predictions = model(data)
 
                 # calculate loss
                 val_loss = meanJointPoseError(predictions, targets)

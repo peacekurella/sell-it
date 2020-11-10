@@ -7,6 +7,7 @@ import torch.nn as nn
 from MVAEencoder import MVAEencoder
 from MVAEdecoder import MVAEdecoder
 
+
 class CharControlMotionVAE(nn.Module):
 
     def __init__(self, FLAGS):
@@ -58,8 +59,7 @@ class CharControlMotionVAE(nn.Module):
             if teacher_forcing:
                 inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :], s2[:, t, :]], dim=1)
             else:
-                inp = torch.cat([b[:, t, :], s1[:, t, :], pred[-1], s2[:, t, :]], dim=1)
-
+                inp = torch.cat([b[:, t, :], s1[:, t, :], torch.squeeze(pred[-1], dim=1), s2[:, t, :]], dim=1)
 
             mu, log_var = self.encoder(inp)
             mus.append(torch.unsqueeze(mu, dim=1))
@@ -71,7 +71,7 @@ class CharControlMotionVAE(nn.Module):
             if teacher_forcing:
                 inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :]], dim=1)
             else:
-                inp = torch.cat([b[:, t, :], s1[:, t, :], pred[-1]], dim=1)
+                inp = torch.cat([b[:, t, :], s1[:, t, :], torch.squeeze(pred[-1], dim=1)], dim=1)
 
             pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
 
