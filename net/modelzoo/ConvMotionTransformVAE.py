@@ -37,10 +37,11 @@ class ConvMotionTransformVAE(nn.Module):
         sample = mu + (eps * std)
         return sample
 
-    def forward(self, x):
+    def forward(self, x, p):
         """
         Defines forward pass for the ConvMotionTransform VAE
         :param x : tuple containing (data, targets) of shape ((batch_size, f, 146),(batch, f, 73))
+        :param p : dummy param
         :output : prediction for seller 2 of shape (batch_size, f, 73)
         """
         x, y = x

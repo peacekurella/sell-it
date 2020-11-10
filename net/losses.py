@@ -59,3 +59,29 @@ def reconstruction_VAE(predictions, target, model_params, lmd):
     loss_cycle = criterion1(z, z_star)
 
     return loss_mse + lmd*loss_kld + 0.1*loss_cycle, loss_mse, loss_kld
+
+def sequential_reconstruction_VAE(predictions, target, model_params, lmd):
+    """
+    Returns the reconstruction and KL divergence loss
+    :param predictions: predictions from the network
+    :param target: target output
+    :param model_parametres
+    :param lmd: beta value for KLD
+    :return: mean loss for the entire batch
+    """
+
+    del model_params
+
+    # unpack the predictions
+    predictions, mu, log_var = predictions
+
+    # set the criterion objects for mse
+    criterion1 = nn.MSELoss(reduction='sum')
+
+    # calculate the reconstruction loss
+    loss_mse = criterion1(predictions, target)
+
+    # calculate the KL Divergence loss
+    loss_kld = torch.mean(torch.sum(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
+
+    return loss_mse + ( lmd * loss_kld )

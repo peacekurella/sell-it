@@ -1,6 +1,7 @@
 import os
 import glob
 import torch
+import random
 import torch.nn as nn
 
 from MVAEencoder import MVAEencoder
@@ -26,10 +27,11 @@ class CharControlMotionVAE(nn.Module):
         sample = mu + (eps * std)
         return sample
 
-    def forward(self, x):
+    def forward(self, x, p):
         """
         Defines forward pass for the ConvMotionTransform VAE
         :param x : tuple containing (data, targets) of shape ((batch_size, f, 146),(batch, f, 73))
+        :param p: probability of teacher forcing
         :output : prediction for seller 2 of shape (batch_size, f, 73)
         """
 
@@ -41,18 +43,39 @@ class CharControlMotionVAE(nn.Module):
 
         # keep track of outputs
         pred = [torch.unsqueeze(s2[:, 0, :], dim=1)]
+        mus = []
+        log_vars = []
+
+        # scheduled teacher forcing
+        if self.training:
+            teacher_forcing = True if random.random() < p else False
+        else:
+            teacher_forcing = False
 
         # iterate through all time steps
         for t in range(1, b.shape[1]):
             # do the encoding
-            inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :], s2[:, t, :]], dim=1)
+            if teacher_forcing:
+                inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :], s2[:, t, :]], dim=1)
+            else:
+                inp = torch.cat([b[:, t, :], s1[:, t, :], pred[-1], s2[:, t, :]], dim=1)
+
             mu, log_var = self.encoder(inp)
+            mus.append(torch.unsqueeze(mu, dim=1))
+            log_vars.append(torch.unsqueeze(log_var, dim=1))
+
             z = self.reparameterize(mu, log_var)
 
             # do the decoding
-            inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :]], dim=1)
+            if teacher_forcing:
+                inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :]], dim=1)
+            else:
+                inp = torch.cat([b[:, t, :], s1[:, t, :], pred[-1]], dim=1)
+
             pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
 
+        if self.training:
+            return torch.cat(pred, dim=1), torch.cat(mus, dim=1), torch.cat(log_vars, dim=1)
         return torch.cat(pred, dim=1)
 
     def save_model(self, path, epoch):
