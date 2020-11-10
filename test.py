@@ -30,7 +30,7 @@ flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'Data/train/', 'Directory containing test files')
 flags.DEFINE_string('output_dir', 'Data/MTVAEoutput/', 'Folder to store final videos')
 flags.DEFINE_string('ckpt', 'ckpt/MTVAE/ME', 'file containing the model weights')
-flags.DEFINE_float('lmd', 0.1, 'L1 Regularization factor')
+flags.DEFINE_float('lmd', 0.2, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
 flags.DEFINE_integer('dec_hidden_units', 128, 'Decoder LSTM hidden units')
@@ -42,7 +42,7 @@ flags.DEFINE_float('dropout', 0.25, 'dense network dropout')
 flags.DEFINE_float('tf_ratio', 0.5, 'teacher forcing ratio')
 flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
 flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
-flags.DEFINE_integer('latent_dim', 128, 'latent dimension')
+flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
@@ -52,6 +52,7 @@ flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
 flags.DEFINE_integer('num_saves', 20, 'number of outputs to save')
+flags.DEFINE_integer('test_ckpt', 30, 'checkpoint to test')
 
 pss = lambda a, b: a == b
 
@@ -163,7 +164,7 @@ def main(arg):
 
     model = get_model()
 
-    model.load_model(ckpt, None)
+    model.load_model(ckpt, FLAGS.test_ckpt)
     model.eval()
 
     num_saves = 0
