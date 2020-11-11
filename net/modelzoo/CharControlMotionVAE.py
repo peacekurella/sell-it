@@ -17,6 +17,7 @@ class CharControlMotionVAE(nn.Module):
         super(CharControlMotionVAE, self).__init__()
         self.encoder = MVAEencoder(FLAGS)
         self.decoder = MVAEdecoder(FLAGS)
+        self.latent_dim = FLAGS.latent_dim
 
     def reparameterize(self, mu, log_var):
         """
