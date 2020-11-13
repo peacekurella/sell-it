@@ -10,16 +10,26 @@ class LinearModel(nn.Module):
         self.input_size = inp_size
         self.output_size = op_size
 
-        self.network = nn.Sequential(
-            nn.Linear(inp_size, 256),
-            nn.ELU(),
-
-            nn.Linear(256, 256),
-            nn.ELU(),
-
-            nn.Linear(256, op_size),
+        self.lys = [
+            nn.Dropout(FLAGS.enc_dropout),
+            nn.Linear(inp_size, FLAGS.enc_hidden_units),
             nn.ELU()
-        )
+        ]
+
+        for _ in range(FLAGS.enc_layers - 1):
+            self.lys.extend([
+                nn.Dropout(FLAGS.enc_dropout),
+                nn.Linear(FLAGS.enc_hidden_units, FLAGS.enc_hidden_units),
+                nn.ELU()
+            ])
+
+        self.lys.extend([
+            nn.Dropout(FLAGS.enc_dropout),
+            nn.Linear(FLAGS.enc_hidden_units, op_size),
+            nn.ELU()
+        ])
+
+        self.network = nn.Sequential(*self.lys)
 
     def forward(self, x):
         """

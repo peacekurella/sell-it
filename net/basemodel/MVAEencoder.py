@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from LinearModel import LinearModel
 
+
 class MVAEencoder(nn.Module):
     """Single layer frame by frame encoder"""
 
@@ -14,11 +15,11 @@ class MVAEencoder(nn.Module):
         super(MVAEencoder, self).__init__()
 
         # define the model
-        self.network = LinearModel(FLAGS, FLAGS.input_dim*4, 256) # make this a FLAG later
+        self.network = LinearModel(FLAGS, FLAGS.input_dim * 4, FLAGS.enc_hidden_units)  # make this a FLAG later
 
         # two outputs layers for mean and std to sample from
-        self.output_mean = nn.Linear(256, FLAGS.latent_dim)
-        self.output_std = nn.Linear(256, FLAGS.latent_dim)
+        self.output_mean = nn.Linear(FLAGS.enc_hidden_units, FLAGS.latent_dim)
+        self.output_std = nn.Linear(FLAGS.enc_hidden_units, FLAGS.latent_dim)
 
     def forward(self, x):
         """

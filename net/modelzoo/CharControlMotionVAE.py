@@ -161,5 +161,4 @@ class CharControlMotionVAE(nn.Module):
         :param epoch: epoch number
         :return: load successful or not in bool
         """
-
-        return True
+        pass

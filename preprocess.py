@@ -290,7 +290,7 @@ class SkeletonHandler:
 
     def recover_global_positions(self, processed, initRot, initTrans):
         """
-        Rescovers the original global positions given the Holden form
+        Recovers the original global positions given the Holden form
         :param processed: Holden data format gestures (F, 73)
         :param initRot: intial rotation of the skeleton
         :param initTrans: initial translation of the skeleton

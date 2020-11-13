@@ -12,14 +12,15 @@ class MVAEdecoder(nn.Module):
 
         super(MVAEdecoder, self).__init__()
 
-        self.layers = nn.ModuleList([
-            nn.Linear((FLAGS.input_dim * 3) + FLAGS.latent_dim, 256),
-            nn.Linear(256 + FLAGS.latent_dim, 256),
-            nn.Linear(256 + FLAGS.latent_dim, 256),
-            nn.Linear(256, FLAGS.output_dim)
+        self.lys = nn.ModuleList([
+            nn.Linear((FLAGS.input_dim * 3) + FLAGS.latent_dim, FLAGS.dec_hidden_units),
+            nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim, FLAGS.dec_hidden_units),
+            nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim, FLAGS.dec_hidden_units),
+            nn.Linear(FLAGS.dec_hidden_units, FLAGS.output_dim)
         ])
 
         self.activation = nn.ELU()
+        self.dropout = nn.Dropout(FLAGS.dec_dropout)
 
     def forward(self, x, z):
         """
@@ -29,8 +30,9 @@ class MVAEdecoder(nn.Module):
         :return: output
         """
 
-        for layer in self.layers[:-1]:
+        for layer in self.lys[:-1]:
+            x = self.dropout(x)
             x = layer(torch.cat([x, z], dim=1))
             x = self.activation(x)
 
-        return self.layers[-1](x)
+        return self.lys[-1](x)
