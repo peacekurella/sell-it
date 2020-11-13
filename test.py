@@ -23,13 +23,14 @@ from DebugVisualizer import DebugVisualizer
 from HagglingDataset import HagglingDataset
 from Quaternions import Quaternions
 from preprocess import SkeletonHandler
+from CharControlMotionVAE import CharControlMotionVAE
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'Data/train/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', 'Data/MTVAEoutput/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', 'ckpt/MTVAE/ME', 'file containing the model weights')
+flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
+flags.DEFINE_string('ckpt', 'ckpt/MVAE/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.2, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 128, 'Encoder LSTM hidden units')
@@ -46,13 +47,13 @@ flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
-flags.DEFINE_string('model', "MTVAE", 'Defines the name of the model')
-flags.DEFINE_bool('CNN', True, 'Cnn based model')
+flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
+flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
 flags.DEFINE_integer('num_saves', 20, 'number of outputs to save')
-flags.DEFINE_integer('test_ckpt', 30, 'checkpoint to test')
+flags.DEFINE_integer('test_ckpt', 40, 'checkpoint to test')
 
 pss = lambda a, b: a == b
 
@@ -103,6 +104,8 @@ def get_model():
         return LstmBodyAE(FLAGS).cuda()
     if FLAGS.model == 'MTVAE':
         return ConvMotionTransformVAE(FLAGS).cuda()
+    if FLAGS.model == 'MVAE':
+        return CharControlMotionVAE(FLAGS).cuda()
     else:
         return BodyMotionGenerator(FLAGS).cuda()
 
@@ -202,7 +205,10 @@ def main(arg):
                 # forward pass through the network
                 if FLAGS.VAE:
                     data = (data, targets)
-                predictions = model(data)
+                    predictions = model(data, 0)
+
+                else:
+                    predictions = model(data)
 
                 # get loss
                 # loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)

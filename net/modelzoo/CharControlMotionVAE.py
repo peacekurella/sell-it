@@ -17,6 +17,7 @@ class CharControlMotionVAE(nn.Module):
         super(CharControlMotionVAE, self).__init__()
         self.encoder = MVAEencoder(FLAGS)
         self.decoder = MVAEdecoder(FLAGS)
+        self.latent_dim = FLAGS.latent_dim
 
     def reparameterize(self, mu, log_var):
         """
@@ -61,11 +62,15 @@ class CharControlMotionVAE(nn.Module):
             else:
                 inp = torch.cat([b[:, t, :], s1[:, t, :], torch.squeeze(pred[-1], dim=1), s2[:, t, :]], dim=1)
 
-            mu, log_var = self.encoder(inp)
-            mus.append(torch.unsqueeze(mu, dim=1))
-            log_vars.append(torch.unsqueeze(log_var, dim=1))
+            if self.training:
+                mu, log_var = self.encoder(inp)
+                mus.append(torch.unsqueeze(mu, dim=1))
+                log_vars.append(torch.unsqueeze(log_var, dim=1))
 
-            z = self.reparameterize(mu, log_var)
+                z = self.reparameterize(mu, log_var)
+
+            else:
+                z = torch.randn((x.shape[0], self.latent_dim)).cuda()
 
             # do the decoding
             if teacher_forcing:
