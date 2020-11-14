@@ -1,0 +1,34 @@
+program: train.py
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  learning_rate:
+    min: 0.0001
+    max: 0.1
+  epochs:
+    min: 50
+    max: 200
+  lmd:
+    min: 0.01
+    max: 0.5
+  batch_size:
+    min: 32
+    max: 256
+  optimizer:
+    values: ["adam", "sgd", "rmsprop"]
+  latent_dim:
+    values: [16, 32, 48, 64, 128]
+  enc_dropout:
+    min: 0
+    max: 0.3
+  dec_dropout:
+    min: 0
+    max: 0.3
+  enc_hidden_units:
+    values: [32, 64, 128, 256, 512]
+  dec_hidden_units:
+    values: [32, 64, 128, 256, 512]
+  enc_layers:
+    values: [2, 3, 4, 5, 6]

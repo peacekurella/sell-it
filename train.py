@@ -47,7 +47,7 @@ flags.DEFINE_float('tf_ratio', 0.3, 'teacher forcing ratio')
 flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
-flags.DEFINE_float('end_scheduled_sampling', 0.6, 'when to stop scheduled sampling')
+flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
@@ -157,7 +157,8 @@ def decay_p(p, epoch):
     :param epoch: current epoch
     """
     if FLAGS.start_scheduled_sampling < epoch / FLAGS.epochs < FLAGS.end_scheduled_sampling:
-        p = p * 0.95
+        num_epochs_decay = (FLAGS.end_scheduled_sampling - FLAGS.start_scheduled_sampling)*FLAGS.epochs
+        p -= 1/num_epochs_decay
     elif epoch / FLAGS.epochs > FLAGS.end_scheduled_sampling:
         p = 0
 
@@ -173,7 +174,20 @@ def get_hyperparameters():
             lmd=FLAGS.lmd,
             optimizer=FLAGS.optimizer
         )
-        return hyperparameter_defaults
+    elif FLAGS.model == "MVAE":
+        hyperparameter_defaults = dict(
+            batch_size=FLAGS.batch_size,
+            learning_rate=FLAGS.learning_rate,
+            epochs=FLAGS.epochs,
+            lmd=FLAGS.lmd,
+            optimizer=FLAGS.optimizer,
+            latent_dim=FLAGS.latent_dim,
+            enc_hidden_units=FLAGS.enc_hidden_units,
+            dec_hidden_units=FLAGS.dec_hidden_units,
+            enc_layers=FLAGS.enc_layers,
+            enc_dropout=FLAGS.enc_dropout,
+            dec_dropout=FLAGS.dec_dropout
+        )
     else:
         hyperparameter_defaults = dict(
             batch_size=FLAGS.batch_size,
@@ -188,7 +202,7 @@ def get_hyperparameters():
             dropout=FLAGS.dropout,
             tf_ratio=FLAGS.tf_ratio
         )
-        return hyperparameter_defaults
+    return hyperparameter_defaults
 
 
 def main(args):
