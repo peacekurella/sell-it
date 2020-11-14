@@ -19,7 +19,6 @@ flags.DEFINE_string('output', '../Data/', 'Output folder to place new files')
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
 flags.DEFINE_integer('step_size', 10, 'window step size')
 
-
 class SkeletonHandler:
     """ Class for Handling Skeleton Data """
 

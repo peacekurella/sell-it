@@ -7,7 +7,6 @@ import torch.nn as nn
 from MVAEencoder import MVAEencoder
 from MVAEdecoder import MVAEdecoder
 
-
 class CharControlMotionVAE(nn.Module):
 
     def __init__(self, FLAGS):

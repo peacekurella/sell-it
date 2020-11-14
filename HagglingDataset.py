@@ -32,6 +32,7 @@ class HagglingDataset(Dataset):
         with open(std_file) as f:
             self.std = json.load(f)
             self.std = np.array(self.std['joints21'])
+            self.std[self.std == 0.0] = 1.0
 
     def __len__(self):
         """
@@ -130,7 +131,7 @@ class HagglingDataset(Dataset):
             # normalize the joint vectors
             joints21 = np.array(data[subject]['frames']['joints21'])
             joints21 = joints21 - self.mean
-            joints21 = np.divide(joints21, self.std, out=np.zeros_like(joints21), where=self.std != 0)
+            joints21 = np.divide(joints21, self.std)
 
             transformed_data[subject] = {
                 'initRot': np.array(initRot),
