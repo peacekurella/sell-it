@@ -52,6 +52,7 @@ flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampli
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
 flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
+flags.DEFINE_bool('pretrain', False, 'Use a pretrained model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
