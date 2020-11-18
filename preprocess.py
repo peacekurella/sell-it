@@ -9,20 +9,32 @@ from absl import flags
 import BVH as BVH
 import Animation as Animation
 from Quaternions import Quaternions
-from InverseKinematics import BasicJacobianIK, JacobianInverseKinematics
+from InverseKinematics import JacobianInverseKinematics
 from Pivots import Pivots
-from DebugVisualizer import DebugVisualizer
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('source', 'HagglingData/', 'Input folder containing source pickle files')
-flags.DEFINE_string('output', '../Data/', 'Output folder to place new files')
+flags.DEFINE_string('bodyData', 'HagglingData/', 'Input folder containing source pickle files')
+flags.DEFINE_string('faceData', None, 'Input folder containing source pickle files')
+flags.DEFINE_string('speechData', 'HagglingSpeechData/', 'Input folder containing speech annotations')
+flags.DEFINE_string('retData', 'Retargeted/', 'Intermediate output folder')
+flags.DEFINE_string('output', 'HoldenData/', 'Output folder to place new files')
+flags.DEFINE_string('format', 'holden', 'Data format to export')
+
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
 flags.DEFINE_integer('step_size', 10, 'window step size')
 
-class SkeletonHandler:
-    """ Class for Handling Skeleton Data """
+
+class MotionRetargeter:
 
     def __init__(self):
+        # Note: we flip Y axis for the Panoptic, so left-right are flipped
+        self.mapping = {
+            13: 0, 16: 1,
+            2: 12, 3: 13, 4: 14,  # left hip,knee, ankle, footend
+            7: 6, 8: 7, 9: 8,  # right hip,knee, ankle, footend
+            17: 0, 18: 9, 19: 10, 20: 11,
+            24: 0, 25: 3, 26: 4, 27: 5
+        }
 
         # selection indexes
         self.jointIdx = np.array([
@@ -33,35 +45,6 @@ class SkeletonHandler:
             18, 19, 20, 22,
             25, 26, 27, 29
         ])
-
-        # Note: we flip Y axis for the Panoptic, so left-right are flipped
-        self.mapping = {
-            13: 0, 16: 1,
-            2: 12, 3: 13, 4: 14,  # left hip,knee, ankle, footend
-            7: 6, 8: 7, 9: 8,  # right hip,knee, ankle, footend
-            17: 0, 18: 9, 19: 10, 20: 11,
-            24: 0, 25: 3, 26: 4, 27: 5
-        }
-
-    def softmax(self, x, **kw):
-        """
-        Softmax function. Courtesy: @jhugestar
-        :param x: input vector
-        :param kw: input args
-        :return: softmax output
-        """
-        softness = kw.pop('softness', 1.0)
-        maxi, mini = np.max(x, **kw), np.min(x, **kw)
-        return maxi + np.log(softness + np.exp(mini - maxi))
-
-    def softmin(self, x, **kw):
-        """
-        Softmin function. Courtesy: @jhugestar
-        :param x: input vector
-        :param kw: arguments
-        :return: softmin outputs
-        """
-        return -self.softmax(-x, **kw)
 
     @staticmethod
     def generate_rest_pose(in_path, out_path):
@@ -116,7 +99,7 @@ class SkeletonHandler:
         panopticHeight = np.mean(np.sqrt(np.sum(panopticThigh, axis=1)))
 
         # load the rest skeleton
-        rest, names, _ = BVH.load('meta/rest.bvh')
+        rest, names, _ = BVH.load('../meta/rest.bvh')  # temp
 
         # create a mock animation for the required duration
         anim = rest.copy()
@@ -164,9 +147,140 @@ class SkeletonHandler:
         anim.positions = anim.positions * 6.25
         anim.offsets = anim.offsets * 6.25
 
-        return anim
+        # Do FK recover 3D joint positions, select required Joints only
+        positions = Animation.positions_global(anim)
+        positions = positions[:, self.jointIdx]
 
-    def export_animation(self, positions):
+        return positions
+
+
+def process_pkl_file(body_directory, face_directory, speech_directory, file):
+    # get the motion data file
+    motionData = os.path.join(body_directory, file)
+    motionData = open(motionData, "rb")
+    motionData = pickle.load(motionData, encoding="Latin-1")
+
+    # get the role IDs
+    lsId = motionData['leftSellerId']
+    bId = motionData['buyerId']
+
+    # get the motion data file
+    speechData = os.path.join(speech_directory, file)
+    speechData = open(speechData, "rb")
+    speechData = pickle.load(speechData, encoding="Latin-1")
+
+    # create an instance of the retargeter
+    retargeter = MotionRetargeter()
+
+    # final output dict
+    sub = {}
+
+    # go through all the subjects
+    for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
+
+        # get humanId
+        humanId = subjectInfo['humanId']
+
+        # get bodyNormal and faceNormal Info
+        bodyNormal = subjectInfo['bodyNormal'][1:]
+        faceNormal = subjectInfo['faceNormal'][1:]
+
+        # read in the pose data from pkl file
+        normalizedPose = subjectInfo['joints19']
+
+        # retarget onto CMU skeleton
+        positions = retargeter.retarget_skeleton(normalizedPose)
+
+        # face data
+        # replace with a function that returns the expression vector
+        faceData = np.zeros((positions.shape[0], positions.shape[1] * positions.shape[2]))
+
+        # read the speech data
+        for speechInfo in speechData['speechData']:
+            if speechInfo['humanId'] == humanId:
+                speechInfo = speechInfo['indicator'][1:]
+                break
+
+        if humanId == bId:
+            role = 'buyer'
+        elif humanId == lsId:
+            role = 'leftSeller'
+        else:
+            role = 'rightSeller'
+
+        sub[role] = {
+            'bodyData': [positions, bodyNormal, faceNormal],
+            'faceData': faceData,
+            'speechData': speechInfo
+        }
+
+    return sub
+
+
+def export_retargeted(body_directory, face_directory, speech_directory, output_directory):
+    """
+    Unifies the body, face, and speech data
+    :param body_directory: Body Data directory
+    :param face_directory: Face Data directory
+    :param speech_directory: Speech Data directory
+    :param output_directory: Output Data directory
+    :return: None
+    """
+
+    # load a list of all bad files
+    bad_files = open("meta/bad_files.json")
+    bad_files = json.load(bad_files)
+    bad_files = bad_files["file_names"]
+
+    # list of all files
+    files = os.listdir(body_directory)
+
+    # make sure ouput directory exists
+    if not os.path.isdir(output_directory):
+        os.makedirs(output_directory)
+
+    # go through all the files in the dataset
+    for file in files:
+
+        # if not a bad file, retarget
+        if file.split('.')[0] not in bad_files:
+            # retargeted data with speech, face, body information
+            retargeted_data = process_pkl_file(body_directory, face_directory, speech_directory, file)
+
+            # dump the pickle file
+            with open(os.path.join(output_directory, file), 'wb') as handle:
+                pickle.dump(retargeted_data, handle)
+
+
+class HoldenDataFormat:
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def softmax(x, **kw):
+        """
+        Softmax function. Courtesy: @jhugestar
+        :param x: input vector
+        :param kw: input args
+        :return: softmax output
+        """
+        softness = kw.pop('softness', 1.0)
+        maxi, mini = np.max(x, **kw), np.min(x, **kw)
+        return maxi + np.log(softness + np.exp(mini - maxi))
+
+    @staticmethod
+    def softmin(x, **kw):
+        """
+        Softmin function. Courtesy: @jhugestar
+        :param x: input vector
+        :param kw: arguments
+        :return: softmin outputs
+        """
+        return -HoldenDataFormat.softmax(-x, **kw)
+
+    @staticmethod
+    def export_animation(positions):
         """
         Converts animations into Learning format
         :param positions: animation to be exported
@@ -174,15 +288,15 @@ class SkeletonHandler:
         """
 
         # floor the positions
-        positions = self.floor_skelton(positions)
+        positions = HoldenDataFormat.floor_skelton(positions)
 
         # get root projection
-        r_pjx = self.project_root(positions)
+        r_pjx = HoldenDataFormat.project_root(positions)
         positions = np.concatenate([r_pjx, positions], axis=1)
         trans = positions[0, 0:1, :].copy()
 
         # get foot contacts
-        feet_l, feet_r = self.generate_foot_contacts(positions)
+        feet_l, feet_r = HoldenDataFormat.generate_foot_contacts(positions)
 
         # get root velocity
         velocity = (positions[1:, 0:1] - positions[:-1, 0:1]).copy()
@@ -194,7 +308,7 @@ class SkeletonHandler:
         positions[:, :, 2] = positions[:, :, 2] - trans_z
 
         # get forward direction
-        forward = self.get_body_normal(positions)
+        forward = HoldenDataFormat.get_body_normal(positions)
 
         # rotate by Y axis to make sure skeleton faces the forward direction
         target = np.array([[0, 0, 1]]).repeat(len(forward), axis=0)
@@ -215,7 +329,8 @@ class SkeletonHandler:
 
         return positions, -rotations[0], trans
 
-    def floor_skelton(self, skeleton):
+    @staticmethod
+    def floor_skelton(skeleton):
         """
         Puts the skeleton on the floor(x-z) plane
         :param skeleton: input global positions of skeleton (F, J, 3)
@@ -224,18 +339,22 @@ class SkeletonHandler:
 
         fid_l, fid_r = np.array([3, 4]), np.array([7, 8])
         foot_heights = np.minimum(skeleton[:, fid_l, 1], skeleton[:, fid_r, 1]).min(axis=1)
-        floor_height = self.softmin(foot_heights, softness=0.5, axis=0)
+        floor_height = HoldenDataFormat.softmin(foot_heights, softness=0.5, axis=0)
         skeleton[:, :, 1] -= floor_height
 
         return skeleton
 
-    def project_root(self, skeleton):
+    @staticmethod
+    def project_root(skeleton):
         """
         Returns the roots projection on the ground plane
         :param skeleton: input global positions of skeleton (F, J, 3)
         :return: projection of root on the ground (F, 1, 3)
         """
+
         trajectory_filterwidth = 3
+
+        # get the reference direction
         reference = skeleton[:, 0] * np.array([1, 0, 1])
 
         # smooth it out with gaussian filters
@@ -243,7 +362,8 @@ class SkeletonHandler:
 
         return reference[:, np.newaxis]
 
-    def generate_foot_contacts(self, positions):
+    @staticmethod
+    def generate_foot_contacts(positions):
         """
         Generate foot contact signals
         :param positions: Input global positions (F, J+1, 3)
@@ -267,7 +387,8 @@ class SkeletonHandler:
 
         return feet_l, feet_r
 
-    def get_body_normal(self, positions):
+    @staticmethod
+    def get_body_normal(positions):
         """
         Returns the forward direction of the skeleton
         :param positions: Global position tensor (F, J+1, 3)
@@ -287,7 +408,8 @@ class SkeletonHandler:
 
         return forward
 
-    def recover_global_positions(self, processed, initRot, initTrans):
+    @staticmethod
+    def recover_global_positions(processed, initRot, initTrans):
         """
         Recovers the original global positions given the Holden form
         :param processed: Holden data format gestures (F, 73)
@@ -326,193 +448,141 @@ class SkeletonHandler:
             offsets.append(rotation * np.array([0, 0, 1]))
             translation = translation + rotation * np.array([root_x[i], 0, root_z[i]])
 
-        joints = self.floor_skelton(joints[:, 1:])
+        joints = HoldenDataFormat.floor_skelton(joints[:, 1:])
         return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
 
 
-def save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal):
-    subject_info = {"joints21": h_form,
-                    "body_normal": bodyNormal,
-                    "face_normal": faceNormal}
-    subjects[key_string]["frames"] = subject_info
-    subjects[key_string]["initRot"] = initRotEuler
-    subjects[key_string]["initTrans"] = initTrans
+def export_holden_data(input_directory, output_directory, window_length, stride):
+    """
+    exports the data in Holden format
+    :param input_directory: Input directory of retargeted skeletons
+    :param output_directory: Output directory
+    :return:
+    """
 
-    return subjects
+    # load a list of all testing_files
+    test_list = open("meta/testing_files.json")
+    test_list = json.load(test_list)
+    test_list = test_list["file_names"]
 
+    # train count and test count
+    test_dir = os.path.join(output_directory, 'test')
+    if not os.path.isdir(test_dir):
+        os.makedirs(test_dir)
 
-def get_window_info(start_index, end_index, numFrames, padding_length, sub, key, datahandler):
-    # adjust start and end index to get the correct number of frames in the window
-    if end_index == numFrames:
-        positions = sub[key][0][start_index - 1:end_index, :, :].copy()
-    else:
-        positions = sub[key][0][start_index:end_index + 1, :, :].copy()
+    train_dir = os.path.join(output_directory, 'train')
+    if not os.path.isdir(train_dir):
+        os.makedirs(train_dir)
 
-    # convert positions to required format
-    h_form, initRot, initTrans = datahandler.export_animation(positions)
-    bodyNormal = sub[key][1][:, start_index:end_index].copy()
-    faceNormal = sub[key][2][:, start_index:end_index].copy()
-    # padding the arrays
-    if start_index < padding_length:
-        h_form = np.pad(h_form, ((padding_length, 0), (0, 0)))
-        bodyNormal = np.pad(bodyNormal, ((0, 0), (padding_length, 0)))
-        faceNormal = np.pad(faceNormal, ((0, 0), (padding_length, 0)))
+    stats_dir = os.path.join(output_directory, 'stats')
+    if not os.path.isdir(stats_dir):
+        os.makedirs(stats_dir)
 
-    # convert rotation quaternion to euler form list, also convert all np arrays to list
-    initRotEuler = initRot.euler().tolist()
-    initTrans = initTrans.tolist()
-    h_form = h_form.tolist()
-    bodyNormal = bodyNormal.tolist()
-    faceNormal = faceNormal.tolist()
+    train, test = 0, 0
 
-    return h_form, initRotEuler, initTrans, bodyNormal, faceNormal
+    joints_21 = []
+    faces = []
 
+    # go through all files
+    for file in os.listdir(input_directory):
 
-def read_pkl_and_extract_skeleton(motionData, sub, datahandler):
-    # Read the pkl file
-    for pid, subjectInfo in enumerate(motionData['subjects']):  # pid = 0,1, or 2. (Not humanId)
+        print(file.split('.')[0])
 
-        # get humanId
-        humanId = subjectInfo['humanId']
+        # read the pkl file
+        with open(os.path.join(input_directory, file), "rb") as handle:
+            retargeted_data = pickle.load(handle, encoding='Latin-1')
 
-        # get bodyNormal and faceNormal Info
-        bodyNormal = subjectInfo['bodyNormal'][1:]
-        faceNormal = subjectInfo['faceNormal'][1:]
+        # set num frames
+        num_frames = len(retargeted_data['buyer']['bodyData'][0])
 
-        # read in the pose data from pkl file
-        normalizedPose = subjectInfo['joints19']
+        # windowing through the sequence
+        for idx in range(0, num_frames, stride):
 
-        # retarget onto CMU skeleton
-        anim = datahandler.retarget_skeleton(normalizedPose)
+            output_window = {}
 
-        # Do FK recover 3D joint positions, select required Joints only
-        positions = Animation.positions_global(anim)
-        positions = positions[:, datahandler.jointIdx]
+            for role in retargeted_data:
 
-        sub[humanId] = [positions, bodyNormal, faceNormal]
+                positions, bodyNormal, faceNormal = retargeted_data[role]['bodyData']
+                faceData = retargeted_data[role]['faceData'][idx + 1: idx + window_length + 1]
+                if len(faceData.shape) > 2:
+                    faceData = faceData.reshape(faceData.shape[0], -1)
+                speechData = retargeted_data[role]['speechData'][:, np.newaxis][idx + 1: idx + window_length + 1]
 
+                # dont do anything if more than 95% of the window needs padding
+                if positions[idx: idx + window_length + 1].shape[0] <= 0.95 * window_length:
+                    continue
 
-def write_window(folder_name, file_name, data_dict):
-    # write the file to the given folder
-    x = open(folder_name + file_name, 'w')
-    with x as outfile:
-        json.dump(data_dict, outfile, sort_keys=False, indent=2)
+                anim, rot, trans = HoldenDataFormat.export_animation(positions[idx: idx + window_length + 1])
 
+                # pad if needed
+                if anim.shape[0] < window_length:
+                    # set the padding length
+                    pad_length = window_length - anim.shape[0]
 
-def main(argv):
-    print('flag arguments')
-    print('source folder', FLAGS.source)
-    print('output folder', FLAGS.output)
-    print('window_size', FLAGS.window_size)
-    print('step_size', FLAGS.step_size)
+                    # pad the outputs
+                    anim = np.concatenate([anim, np.zeros((pad_length, anim.shape[1]))], axis=0)
+                    faceData = np.concatenate([faceData, np.zeros((pad_length, faceData.shape[1]))], axis=0)
+                    speechData = np.concatenate([speechData, np.zeros((pad_length, speechData.shape[1]))], axis=0)
 
-    input_folder = FLAGS.source
-    output_folder = FLAGS.output
-    window_size = FLAGS.window_size
-    step_size = FLAGS.step_size
-    os.makedirs(output_folder, exist_ok=True)
-    train_folder = output_folder + "/train/"
-    test_folder = output_folder + "/test/"
-    os.makedirs(train_folder, exist_ok=True)
-    os.makedirs(test_folder, exist_ok=True)
+                if file not in test_list:
+                    joints_21.append(anim)
+                    faces.append(faceData)
 
-    f = open("meta/testing_files.json")
-    test_list_file = json.load(f)
-    test_list = test_list_file["file_names"]
+                output_window[role] = {
+                    'joints21': anim,
+                    'initRot': rot,
+                    'initTrans': trans,
+                    'faceData': faceData,
+                    'speechData': speechData,
+                    'bodyNormal': np.swapaxes(bodyNormal[:, idx + 1: idx + window_length + 1], 0, 1),
+                    'faceNormal': np.swapaxes(faceNormal[:, idx + 1: idx + window_length + 1], 0, 1)
+                }
 
-    j = open("meta/bad_files.json")
-    bad_files = json.load(j)
-    bad_files = bad_files["file_names"]
-
-    files = os.listdir(input_folder)
-    test_count = 0
-    train_count = 0
-
-    for file in files:
-        if file.split('.')[0] not in bad_files:
-            read_file = input_folder + file
-            r = open(read_file, "rb")
-            motionData = pickle.load(r, encoding="Latin-1")
-            datahandler = SkeletonHandler()
-
-            # The meta directory contains the rest poses
-            # datahandler.generate_rest_pose('meta', 'meta')
-            # skel = []
-
-            data_dict = {"winner_id": motionData['winnerId'], "subjects": {}, "padding_length": 0}
-            numFrames = motionData['subjects'][0]['joints19'].shape[1]
-            padding_length = 0
-            num_windows = int(numFrames / step_size)
-            if numFrames % step_size != 0:
-                padding_length = step_size - (numFrames % step_size)
-                num_windows += 1
-
-            # create dictionary for each subject
-            bid = motionData['buyerId']
-            lid = motionData['leftSellerId']
-            rid = motionData['rightSellerId']
-            sub = {bid: [], lid: [], rid: []}
-
-            read_pkl_and_extract_skeleton(motionData, sub, datahandler)
-
-            subjects = {'buyer': {"human_Id": bid, "initRot": [],
-                                  "initTrans": [], "frames": [{}]},
-                        'leftSeller': {"human_Id": lid, "initRot": [],
-                                       "initTrans": [], "frames": [{}]},
-                        "rightSeller": {"human_Id": rid, "initRot": [],
-                                        "initTrans": [], "frames": [{}]}}
-
-            name = file.split('.')[0]
-            file_char = name.split('_')
-
-            # to check if file should be in test or train folder
-            file_group_name = '_'.join(file_char[0:-1])
-
-            start_index = 0
-            # if padding, then end_index needs to be adjusted
-            if padding_length > 0:
-                end_index = start_index + window_size - padding_length
+            if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
+                with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
+                    pickle.dump(output_window, handle)
+                test += 1
             else:
-                end_index = start_index + window_size
+                with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
+                    pickle.dump(output_window, handle)
+                train += 1
 
-            while end_index <= numFrames:
-                for key in sub.keys():
-                    h_form, initRotEuler, initTrans, bodyNormal, faceNormal = get_window_info(start_index, end_index,
-                                                                                              numFrames,
-                                                                                              padding_length, sub, key,
-                                                                                              datahandler)
-                    # save to the appropriate dictionary
-                    if key == bid:
-                        key_string = "buyer"
-                        save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal)
-                    elif key == lid:
-                        key_string = "leftSeller"
-                        save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal)
-                    else:
-                        key_string = "rightSeller"
-                        save_subject_info(subjects, key_string, h_form, initRotEuler, initTrans, bodyNormal, faceNormal)
+    # calculate the stats
+    joints_21 = np.concatenate(joints_21, axis=0)
+    faces = np.concatenate(faces, axis=0)
 
-                data_dict["subjects"] = subjects
-                data_dict["padding_length"] = padding_length
+    bodyMean = np.mean(joints_21, axis=0)[np.newaxis, :]
+    bodyStd = np.std(joints_21, axis=0)[np.newaxis, :]
+    bodyStd[bodyStd == 0.0] = 1.0
 
-                # save the file to the destined folder
-                if file_group_name not in test_list:
-                    file_name = str(train_count) + '.json'
-                    write_window(train_folder, file_name, data_dict)
-                    train_count += 1
-                else:
-                    file_name = str(test_count) + '.json'
-                    write_window(test_folder, file_name, data_dict)
-                    test_count += 1
+    faceMean = np.mean(faces, axis=0)[np.newaxis, :]
+    faceStd = np.std(faces, axis=0)[np.newaxis, :]
+    faceStd[faceStd == 0.0] = 1.0
 
-                # if padding, start_index of next window needs to be adjusted to maintain proper overlap
-                if start_index < padding_length:
-                    start_index += step_size - padding_length
-                    padding_length = 0
-                else:
-                    start_index += step_size
+    means = {
+        'joints21': bodyMean,
+        'faceData': faceMean
+    }
 
-                end_index = start_index + window_size
+    stds = {
+        'joints21': bodyStd,
+        'faceData': faceStd
+    }
+
+    with open(os.path.join(stats_dir, 'mean.pkl'), 'wb') as handle:
+        pickle.dump(means, handle)
+
+    with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
+        pickle.dump(stds, handle)
+
+
+def main(args):
+    # retarget skeletons if needed
+    if not os.path.isdir(FLAGS.retData):
+        export_retargeted(FLAGS.bodyData, FLAGS.faceData, FLAGS.speechData, FLAGS.retData)
+
+    if FLAGS.format == 'holden':
+        export_holden_data(FLAGS.retData, FLAGS.output, FLAGS.window_size, FLAGS.step_size)
 
 
 if __name__ == '__main__':
