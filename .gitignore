@@ -15,3 +15,4 @@ meta/*.joblib
 wandb/*
 
 ckpt/
+upgrade/
