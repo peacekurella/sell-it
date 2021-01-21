@@ -17,8 +17,8 @@ flags.DEFINE_string('bodyData', 'HagglingData/', 'Input folder containing source
 flags.DEFINE_string('faceData', None, 'Input folder containing source pickle files')
 flags.DEFINE_string('speechData', 'HagglingSpeechData/', 'Input folder containing speech annotations')
 flags.DEFINE_string('retData', 'Retargeted/', 'Intermediate output folder')
-flags.DEFINE_string('output', 'HoldenData/', 'Output folder to place new files')
-flags.DEFINE_string('format', 'holden', 'Data format to export')
+flags.DEFINE_string('output', 'MannData/', 'Output folder to place new files')
+flags.DEFINE_string('format', 'mann', 'Data format to export')
 
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
 flags.DEFINE_integer('step_size', 10, 'window step size')
@@ -575,6 +575,246 @@ def export_holden_data(input_directory, output_directory, window_length, stride)
     with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
         pickle.dump(stds, handle)
 
+class MannDataFormat(HoldenDataFormat):
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_human_skeleton():
+        # create the list of connections in the human body
+        # 0 Root
+        # 1 left hip 5 right hip
+        # 2 left knee 6 right knee
+        # 3 left ankle 7 right ankle
+        # 4 left toe 8 right toe
+        # 9 torso 10 chest
+        # 11 neck 12 nose
+        # 13 left shoulder 17 right shoulder
+        # 14 left elbow 18 right elbow
+        # 19 left wrist 15 right wrist
+        # 16 left thumb 20 right thumb
+        humanSkeleton = [
+            [1, 5],
+            [0, 9],
+            [9, 10],
+            [10, 11],
+            [11, 12],
+            [5, 6],
+            [1, 2],
+            [6, 7],
+            [2, 3],
+            [13, 17],
+            [17, 18],
+            [13, 14],
+            [14, 15],
+            [18, 19]
+        ]
+        return humanSkeleton
+
+    @staticmethod
+    def get_body_normal(positions):
+        """
+        Returns the forward direction of the skeleton
+        :param positions: Global position tensor (F, J, 3)
+        :return: Body normals paralell to x-z plane
+        """
+
+        sdr_l, sdr_r, hip_l, hip_r = 13, 17, 1, 5
+        across1 = positions[:, hip_l] - positions[:, hip_r]
+        across0 = positions[:, sdr_l] - positions[:, sdr_r]
+        across = across0 + across1
+        across = across / np.sqrt((across ** 2).sum(axis=-1))[..., np.newaxis]
+
+        direction_filterwidth = 20
+        forward = np.cross(across, np.array([[0, 1, 0]]))
+        forward = filters.gaussian_filter1d(forward, direction_filterwidth, axis=0, mode='nearest')
+        forward = forward / np.sqrt((forward ** 2).sum(axis=-1))[..., np.newaxis]
+
+        return forward
+
+    @staticmethod
+    def export_animation(positions):
+        """
+        Defines the class to convert original data to MANN data format
+        :param positions: original data (F, J, 3)
+        :return: returns the exported dimensions
+        """
+        # floor the positions
+        positions = HoldenDataFormat.floor_skelton(positions)
+
+        # get root projection
+        r_pjx = HoldenDataFormat.project_root(positions)
+
+        # get forward direction and project it onto ground
+        forward = MannDataFormat.get_body_normal(positions)
+
+        # get root velocity
+        r_vel = r_pjx[1:] - r_pjx[:-1]
+        r_vel = np.reshape(r_vel[:, :, [0, 2]], (r_vel.shape[0], -1))
+
+        # get angular velocity
+        target = forward[:-1]
+        a_vel = Quaternions.between(forward[1:], target)[:, np.newaxis].qs
+        a_vel = np.reshape(a_vel, (a_vel.shape[0], -1))
+
+        # calculate joint positions w.r.to root projection
+        joint_positions = positions - r_pjx
+
+        # calculate joint velocities in character space
+        joint_velocities = joint_positions[1:] - joint_positions[:-1]
+        joint_velocities = np.reshape(joint_velocities, (joint_velocities.shape[0], -1))
+
+        # calculate joint orientations ( orientation of the bone )
+        joint_orientation = []
+        for bone in MannDataFormat.get_human_skeleton():
+            start, end = bone[0], bone[1]
+            orientation = joint_positions[:, end] - joint_positions[:, start]
+            orientation = orientation / np.sqrt((orientation ** 2).sum(axis=-1))[..., np.newaxis]
+            target = np.array([[0, 0, 1]]).repeat(len(orientation), axis=0)
+            orientation_z = Quaternions.between(orientation, target)[:, np.newaxis].qs
+            target = np.array([[0, 1, 0]]).repeat(len(orientation), axis=0)
+            orientation_y = Quaternions.between(orientation, target)[:, np.newaxis].qs
+            joint_orientation.append(np.concatenate([orientation_y, orientation_z], axis=-1))
+
+        joint_orientation = np.concatenate(joint_orientation, axis=1)
+        joint_orientation = np.reshape(joint_orientation, (joint_orientation.shape[0], -1))
+
+        joint_positions = np.reshape(joint_positions, (joint_positions.shape[0], -1))
+
+        pose = np.concatenate([r_vel, a_vel, joint_positions[:-1], joint_velocities, joint_orientation[:-1]], axis=-1)
+
+
+        return pose, r_pjx[0], forward[0]
+
+
+
+
+
+
+def export_mann_data(input_directory, output_directory, window_length, stride):
+    """
+    exports the data in MANN format
+    :param input_directory: Input directory of retargeted skeletons
+    :param output_directory: Output directory
+    :return:
+    """
+
+    # load a list of all testing_files
+    test_list = open("meta/testing_files.json")
+    test_list = json.load(test_list)
+    test_list = test_list["file_names"]
+
+    # train count and test count
+    test_dir = os.path.join(output_directory, 'test')
+    if not os.path.isdir(test_dir):
+        os.makedirs(test_dir)
+
+    train_dir = os.path.join(output_directory, 'train')
+    if not os.path.isdir(train_dir):
+        os.makedirs(train_dir)
+
+    stats_dir = os.path.join(output_directory, 'stats')
+    if not os.path.isdir(stats_dir):
+        os.makedirs(stats_dir)
+
+    train, test = 0, 0
+
+    joints_21 = []
+    faces = []
+
+    # go through all files
+    for file in os.listdir(input_directory):
+
+        print(file.split('.')[0])
+
+        # read the pkl file
+        with open(os.path.join(input_directory, file), "rb") as handle:
+            retargeted_data = pickle.load(handle, encoding='Latin-1')
+
+        # set num frames
+        num_frames = len(retargeted_data['buyer']['bodyData'][0])
+
+        # windowing through the sequence
+        for idx in range(0, num_frames, stride):
+
+            output_window = {}
+
+            for role in retargeted_data:
+
+                positions, bodyNormal, faceNormal = retargeted_data[role]['bodyData']
+                faceData = retargeted_data[role]['faceData'][idx + 1: idx + window_length + 1]
+                if len(faceData.shape) > 2:
+                    faceData = faceData.reshape(faceData.shape[0], -1)
+                speechData = retargeted_data[role]['speechData'][:, np.newaxis][idx + 1: idx + window_length + 1]
+
+                # dont do anything if more than 95% of the window needs padding
+                if positions[idx: idx + window_length + 1].shape[0] <= 0.95 * window_length:
+                    continue
+
+                anim, rot, trans = MannDataFormat.export_animation(positions[idx: idx + window_length + 1])
+
+                # pad if needed
+                if anim.shape[0] < window_length:
+                    # set the padding length
+                    pad_length = window_length - anim.shape[0]
+
+                    # pad the outputs
+                    anim = np.concatenate([anim, np.zeros((pad_length, anim.shape[1]))], axis=0)
+                    faceData = np.concatenate([faceData, np.zeros((pad_length, faceData.shape[1]))], axis=0)
+                    speechData = np.concatenate([speechData, np.zeros((pad_length, speechData.shape[1]))], axis=0)
+
+                if file not in test_list:
+                    joints_21.append(anim)
+                    faces.append(faceData)
+
+                output_window[role] = {
+                    'joints21': anim,
+                    'initRot': rot,
+                    'initTrans': trans,
+                    'faceData': faceData,
+                    'speechData': speechData,
+                    'bodyNormal': np.swapaxes(bodyNormal[:, idx + 1: idx + window_length + 1], 0, 1),
+                    'faceNormal': np.swapaxes(faceNormal[:, idx + 1: idx + window_length + 1], 0, 1)
+                }
+
+            if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
+                with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
+                    pickle.dump(output_window, handle)
+                test += 1
+            else:
+                with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
+                    pickle.dump(output_window, handle)
+                train += 1
+
+    # calculate the stats
+    joints_21 = np.concatenate(joints_21, axis=0)
+    faces = np.concatenate(faces, axis=0)
+
+    bodyMean = np.mean(joints_21, axis=0)[np.newaxis, :]
+    bodyStd = np.std(joints_21, axis=0)[np.newaxis, :]
+    bodyStd[bodyStd == 0.0] = 1.0
+
+    faceMean = np.mean(faces, axis=0)[np.newaxis, :]
+    faceStd = np.std(faces, axis=0)[np.newaxis, :]
+    faceStd[faceStd == 0.0] = 1.0
+
+    means = {
+        'joints21': bodyMean,
+        'faceData': faceMean
+    }
+
+    stds = {
+        'joints21': bodyStd,
+        'faceData': faceStd
+    }
+
+    with open(os.path.join(stats_dir, 'mean.pkl'), 'wb') as handle:
+        pickle.dump(means, handle)
+
+    with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
+        pickle.dump(stds, handle)
+
+
 
 def main(args):
     # retarget skeletons if needed
@@ -583,6 +823,9 @@ def main(args):
 
     if FLAGS.format == 'holden':
         export_holden_data(FLAGS.retData, FLAGS.output, FLAGS.window_size, FLAGS.step_size)
+
+    if FLAGS.format == 'mann':
+        export_mann_data(FLAGS.retData, FLAGS.output, FLAGS.window_size, FLAGS.step_size)
 
 
 if __name__ == '__main__':
