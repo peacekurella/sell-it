@@ -686,10 +686,34 @@ class MannDataFormat(HoldenDataFormat):
 
         return pose, r_pjx[0], forward[0]
 
+    @staticmethod
+    def recover_global_positions(processed, initRot, initTrans):
+        """
+        Recovers global positions from the given animation in Mann form
+        :param processed: positions in Mann form in the character space
+        :param initRot: initial normal direction of the body
+        :param initTrans: initial position of the root projection
+        """
+        r_vel, joint_positions = processed[:, :2], processed[:, 6:69]
 
+        joint_positions = np.reshape(joint_positions, (joint_positions.shape[0], -1, 3))
 
+        initTrans = np.reshape(initTrans, (-1, 3))
 
+        r_vel = np.insert(r_vel, 1, 0, axis=1)
+        r_vel = np.reshape(r_vel, (r_vel.shape[0], 1, -1))
 
+        r_pjx = r_vel.copy()
+        r_pjx[0] += initTrans
+
+        for i in range(1, r_pjx.shape[0]):
+            r_pjx[i] += r_pjx[i-1]
+
+        global_joint_positions = joint_positions + r_pjx
+
+        joints = HoldenDataFormat.floor_skelton(global_joint_positions)
+
+        return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
 
 def export_mann_data(input_directory, output_directory, window_length, stride):
     """
