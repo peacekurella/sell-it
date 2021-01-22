@@ -277,7 +277,7 @@ class HoldenDataFormat:
         :param kw: arguments
         :return: softmin outputs
         """
-        return -HoldenDataFormat.softmax(-x, **kw)
+        return abs(-HoldenDataFormat.softmax(-x, **kw))
 
     @staticmethod
     def export_animation(positions):
@@ -340,6 +340,7 @@ class HoldenDataFormat:
         fid_l, fid_r = np.array([3, 4]), np.array([7, 8])
         foot_heights = np.minimum(skeleton[:, fid_l, 1], skeleton[:, fid_r, 1]).min(axis=1)
         floor_height = HoldenDataFormat.softmin(foot_heights, softness=0.5, axis=0)
+        print(floor_height)
         skeleton[:, :, 1] -= floor_height
 
         return skeleton
@@ -575,6 +576,7 @@ def export_holden_data(input_directory, output_directory, window_length, stride)
     with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
         pickle.dump(stds, handle)
 
+
 class MannDataFormat(HoldenDataFormat):
     def __init__(self):
         pass
@@ -683,8 +685,11 @@ class MannDataFormat(HoldenDataFormat):
 
         pose = np.concatenate([r_vel, a_vel, joint_positions[:-1], joint_velocities, joint_orientation[:-1]], axis=-1)
 
+        initTrans = r_pjx[0].copy()
 
-        return pose, r_pjx[0], forward[0]
+        initRot = forward[0].copy()
+
+        return pose, initRot, initTrans
 
     @staticmethod
     def recover_global_positions(processed, initRot, initTrans):
@@ -699,7 +704,6 @@ class MannDataFormat(HoldenDataFormat):
         joint_positions = np.reshape(joint_positions, (joint_positions.shape[0], -1, 3))
 
         initTrans = np.reshape(initTrans, (-1, 3))
-
         r_vel = np.insert(r_vel, 1, 0, axis=1)
         r_vel = np.reshape(r_vel, (r_vel.shape[0], 1, -1))
 
@@ -707,13 +711,17 @@ class MannDataFormat(HoldenDataFormat):
         r_pjx[0] += initTrans
 
         for i in range(1, r_pjx.shape[0]):
-            r_pjx[i] += r_pjx[i-1]
+            r_pjx[i] += r_pjx[i - 1]
 
-        global_joint_positions = joint_positions + r_pjx
+        joints = joint_positions + r_pjx
 
-        joints = HoldenDataFormat.floor_skelton(global_joint_positions)
+        for i in range(joints.shape[0]):
+            print(joints[i, 4, :])
 
-        return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
+        joints = HoldenDataFormat.floor_skelton(joints)
+
+        # return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
+        return joints
 
 def export_mann_data(input_directory, output_directory, window_length, stride):
     """
@@ -837,7 +845,6 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
 
     with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
         pickle.dump(stds, handle)
-
 
 
 def main(args):
