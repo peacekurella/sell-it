@@ -757,6 +757,9 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
         # set num frames
         num_frames = len(retargeted_data['buyer']['bodyData'][0])
 
+        if len(list(retargeted_data.keys())) < 3:
+            print(file, retargeted_data.keys())
+
         # windowing through the sequence
         for idx in range(0, num_frames, stride):
 
