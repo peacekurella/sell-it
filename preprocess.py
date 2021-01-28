@@ -99,7 +99,7 @@ class MotionRetargeter:
         panopticHeight = np.mean(np.sqrt(np.sum(panopticThigh, axis=1)))
 
         # load the rest skeleton
-        rest, names, _ = BVH.load('../meta/rest.bvh')  # temp
+        rest, names, _ = BVH.load('meta/rest.bvh')  # temp
 
         # create a mock animation for the required duration
         anim = rest.copy()
@@ -277,7 +277,7 @@ class HoldenDataFormat:
         :param kw: arguments
         :return: softmin outputs
         """
-        return abs(-HoldenDataFormat.softmax(-x, **kw))
+        return -HoldenDataFormat.softmax(-x, **kw)
 
     @staticmethod
     def export_animation(positions):
@@ -340,7 +340,6 @@ class HoldenDataFormat:
         fid_l, fid_r = np.array([3, 4]), np.array([7, 8])
         foot_heights = np.minimum(skeleton[:, fid_l, 1], skeleton[:, fid_r, 1]).min(axis=1)
         floor_height = HoldenDataFormat.softmin(foot_heights, softness=0.5, axis=0)
-        print(floor_height)
         skeleton[:, :, 1] -= floor_height
 
         return skeleton
@@ -641,8 +640,6 @@ class MannDataFormat(HoldenDataFormat):
         :param positions: original data (F, J, 3)
         :return: returns the exported dimensions
         """
-        # floor the positions
-        positions = HoldenDataFormat.floor_skelton(positions)
 
         # get root projection
         r_pjx = HoldenDataFormat.project_root(positions)
@@ -708,19 +705,13 @@ class MannDataFormat(HoldenDataFormat):
         r_vel = np.reshape(r_vel, (r_vel.shape[0], 1, -1))
 
         r_pjx = r_vel.copy()
-        r_pjx[0] += initTrans
+        r_pjx[0] = initTrans
 
         for i in range(1, r_pjx.shape[0]):
-            r_pjx[i] += r_pjx[i - 1]
+            r_pjx[i] += r_pjx[i-1]
 
         joints = joint_positions + r_pjx
 
-        for i in range(joints.shape[0]):
-            print(joints[i, 4, :])
-
-        joints = HoldenDataFormat.floor_skelton(joints)
-
-        # return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
         return joints
 
 def export_mann_data(input_directory, output_directory, window_length, stride):
