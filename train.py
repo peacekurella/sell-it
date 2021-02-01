@@ -24,8 +24,8 @@ from losses import *
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', 'Data/train/', 'Directory containing train files')
-flags.DEFINE_string('test', 'Data/test/', 'Directory containing train files')
+flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
+flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
 flags.DEFINE_integer('batch_size', 16, 'Training set mini batch size')
@@ -49,8 +49,8 @@ flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
 flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
 
-flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
-flags.DEFINE_integer('output_dim', 73, 'input pose vector dimension')
+flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
+flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
@@ -143,7 +143,7 @@ def get_optimizer(parameters):
 def get_scheduler(optimizer):
     """
     Returns the LR scheduler
-    :param optimizer: Pytorch optimizer
+    :param optimizer: Pytorch optimizerbodyAE
     :return: pytorch lr scheduler
     """
 

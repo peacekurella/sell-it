@@ -17,11 +17,11 @@ class HagglingDataset(Dataset):
 
         # save the directory info
         self.input = directory
-        self.meta = FLAGS.meta
+        self.meta = os.path.join(directory.split('/')[0], 'stats')
 
         # Load the mean and std filenames
-        mean_file = os.path.join(FLAGS.meta, 'mean.pkl')
-        std_file = os.path.join(FLAGS.meta, 'std.pkl')
+        mean_file = os.path.join(self.meta, 'mean.pkl')
+        std_file = os.path.join(self.meta, 'std.pkl')
 
         with open(mean_file, "rb") as f:
             self.mean = pickle.load(f, encoding='Latin-1')
