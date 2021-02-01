@@ -17,8 +17,8 @@ flags.DEFINE_string('bodyData', 'HagglingData/', 'Input folder containing source
 flags.DEFINE_string('faceData', None, 'Input folder containing source pickle files')
 flags.DEFINE_string('speechData', 'HagglingSpeechData/', 'Input folder containing speech annotations')
 flags.DEFINE_string('retData', 'Retargeted/', 'Intermediate output folder')
-flags.DEFINE_string('output', 'MannData/', 'Output folder to place new files')
-flags.DEFINE_string('format', 'mann', 'Data format to export')
+flags.DEFINE_string('output', 'HoldenData/', 'Output folder to place new files')
+flags.DEFINE_string('format', 'holden', 'Data format to export')
 
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
 flags.DEFINE_integer('step_size', 10, 'window step size')
@@ -500,6 +500,10 @@ def export_holden_data(input_directory, output_directory, window_length, stride)
 
             output_window = {}
 
+            # sanity check
+            if len(list(retargeted_data.keys())) < 3:
+                print(file, retargeted_data.keys())
+
             for role in retargeted_data:
 
                 positions, bodyNormal, faceNormal = retargeted_data[role]['bodyData']
@@ -538,14 +542,15 @@ def export_holden_data(input_directory, output_directory, window_length, stride)
                     'faceNormal': np.swapaxes(faceNormal[:, idx + 1: idx + window_length + 1], 0, 1)
                 }
 
-            if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
-                with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
-                    pickle.dump(output_window, handle)
-                test += 1
-            else:
-                with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
-                    pickle.dump(output_window, handle)
-                train += 1
+            if output_window:
+                if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
+                    with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
+                        pickle.dump(output_window, handle)
+                    test += 1
+                else:
+                    with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
+                        pickle.dump(output_window, handle)
+                    train += 1
 
     # calculate the stats
     joints_21 = np.concatenate(joints_21, axis=0)
@@ -757,6 +762,7 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
         # set num frames
         num_frames = len(retargeted_data['buyer']['bodyData'][0])
 
+        # sanity check
         if len(list(retargeted_data.keys())) < 3:
             print(file, retargeted_data.keys())
 
@@ -803,14 +809,15 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
                     'faceNormal': np.swapaxes(faceNormal[:, idx + 1: idx + window_length + 1], 0, 1)
                 }
 
-            if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
-                with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
-                    pickle.dump(output_window, handle)
-                test += 1
-            else:
-                with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
-                    pickle.dump(output_window, handle)
-                train += 1
+            if output_window:
+                if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
+                    with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
+                        pickle.dump(output_window, handle)
+                    test += 1
+                else:
+                    with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
+                        pickle.dump(output_window, handle)
+                    train += 1
 
     # calculate the stats
     joints_21 = np.concatenate(joints_21, axis=0)
