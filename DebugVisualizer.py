@@ -50,7 +50,7 @@ class DebugVisualizer:
         self.dpi = 2000
         self.fig.set_size_inches(19.20, 10.80, True)
         self.ax = p3.Axes3D(self.fig)
-        self.ax.view_init(elev=90, azim=-90)
+        self.ax.view_init(elev=130, azim=-90)
         # self.ax._axis3don = False
         self.ax.set_xlim3d(-200, 200)
         self.ax.set_ylim3d(0, 200)
