@@ -38,12 +38,9 @@ class CharControlMotionVAE(nn.Module):
 
         # unpack into individual sequences
         x, y = x
-        b = x[:, :, :73]
-        s1 = x[:, :, 73:]
-        s2 = y
 
         # keep track of outputs
-        pred = [torch.unsqueeze(s2[:, 0, :], dim=1)]
+        pred = [torch.unsqueeze(y[:, 0, :], dim=1)]
         mus = []
         log_vars = []
 
@@ -54,12 +51,12 @@ class CharControlMotionVAE(nn.Module):
             teacher_forcing = False
 
         # iterate through all time steps
-        for t in range(1, b.shape[1]):
+        for t in range(1, x.shape[1]):
             # do the encoding
             if teacher_forcing:
-                inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :], s2[:, t, :]], dim=1)
+                inp = torch.cat([x[:, t, :], y[:, t - 1, :], y[:, t, :]], dim=1)
             else:
-                inp = torch.cat([b[:, t, :], s1[:, t, :], torch.squeeze(pred[-1], dim=1), s2[:, t, :]], dim=1)
+                inp = torch.cat([x[:, t, :], torch.squeeze(pred[-1], dim=1), y[:, t, :]], dim=1)
 
             if self.training:
                 mu, log_var = self.encoder(inp)
@@ -73,9 +70,9 @@ class CharControlMotionVAE(nn.Module):
 
             # do the decoding
             if teacher_forcing:
-                inp = torch.cat([b[:, t, :], s1[:, t, :], s2[:, t - 1, :]], dim=1)
+                inp = torch.cat([x[:, t, :], y[:, t - 1, :]], dim=1)
             else:
-                inp = torch.cat([b[:, t, :], s1[:, t, :], torch.squeeze(pred[-1], dim=1)], dim=1)
+                inp = torch.cat([x[:, t, :], torch.squeeze(pred[-1], dim=1)], dim=1)
 
             pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
 
