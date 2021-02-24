@@ -134,7 +134,7 @@ class DebugVisualizer:
         """
 
         # create a list of colors
-        colors = ['r', 'b', 'g', 'y']
+        colors = ['r', 'g', 'b', 'y']
 
         pointsList = []
         bonesList = []

@@ -38,7 +38,7 @@ flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
 flags.DEFINE_integer('gat_hidden_units', 256, 'Gating network hidden units')
 flags.DEFINE_integer('enc_layers', 3, 'encoder layers')
 flags.DEFINE_integer('dec_layers', 1, 'decoder layers')
-flags.DEFINE_integer('num_experts', 8, 'number of experts in  decoder')
+flags.DEFINE_integer('num_experts', 3, 'number of experts in  decoder')
 flags.DEFINE_float('enc_dropout', 0.25, 'encoder dropout')
 flags.DEFINE_float('dec_dropout', 0.25, 'decoder dropout')
 flags.DEFINE_float('gat_dropout', 0.25, 'gating network dropout')
@@ -57,7 +57,7 @@ flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
-flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+flags.DEFINE_integer('ckpt', 1, 'Number of epochs to checkpoint')
 
 
 def get_inputs(batch):
