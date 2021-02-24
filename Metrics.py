@@ -19,7 +19,6 @@ class Metrics():
             self.format = HoldenDataFormat()
 
         self.haggling = HagglingDataset(FLAGS.test, FLAGS)
-
         self.num_saves = FLAGS.num_saves
 
         self.output_folder = FLAGS.output_dir
@@ -41,7 +40,39 @@ class Metrics():
 
     @staticmethod
     def get_npss_score(predictions, targets):
-        pass
+        """
+        Calculate the power spectrum similiarity
+        :param predictions:
+        :param targets:
+        :return:
+        """
+
+        targets = targets.reshape(-1, 63)
+        predictions = predictions.reshape(-1, 63)
+
+        target_fft = np.fft.fft(targets, axis=1)
+        predictions_fft = np.fft.fft(predictions, axis=1)
+
+        target_fft = np.square(np.absolute(target_fft))
+        predictions_fft = np.square(np.absolute(predictions_fft))
+
+        target_total_power = np.sum(target_fft, axis=0)[np.newaxis, :]
+        target_total_power[target_total_power == 0] = 1.0
+
+        predictions_total_power = np.sum(predictions_fft, axis=0)[np.newaxis, :]
+        predictions_total_power[predictions_total_power == 0] = 1.0
+
+        seq_feature_power = target_total_power
+
+        target_fft = target_fft / target_total_power
+        predictions_fft = predictions_fft / predictions_total_power
+
+        target_fft = np.cumsum(target_fft, axis=1)
+        predictions_fft = np.cumsum(predictions_fft, axis=1)
+
+        emd = np.linalg.norm((predictions_fft - target_fft), ord=1, axis=0)[np.newaxis, :]
+
+        return np.average(emd, weights=seq_feature_power)
 
     def get_global_positions(self, subjects):
         """
@@ -120,7 +151,6 @@ class Metrics():
         predictions, targets = self.split_into_subjects(predictions, targets, batch)
 
         predictions = self.get_global_positions(predictions)
-
         targets = self.get_global_positions(targets)
 
         metrics = [
@@ -139,4 +169,4 @@ class Metrics():
             self.save_files(predictions[1], targets, 'left', i_batch, test_num)
             self.num_saves -= 1
 
-
+        return metrics

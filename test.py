@@ -110,26 +110,22 @@ def get_model():
 
 
 def main(arg):
-    test_dataset = HagglingDataset(FLAGS.test, FLAGS)
 
+    test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, num_workers=10)
 
     ckpt = FLAGS.ckpt
 
     model = get_model()
-
     model.load_model(ckpt, FLAGS.test_ckpt)
-
     model.eval()
 
     metrics = Metrics(FLAGS)
 
     with torch.no_grad():
-
         for i_batch, batch in enumerate(test_dataloader):
 
             batch_runs = 1
-
             if FLAGS.VAE:
                 batch_runs = FLAGS.batch_runs
 
@@ -142,7 +138,6 @@ def main(arg):
                 if FLAGS.VAE:
                     data = (data, targets)
                     predictions = model(data, 0)
-
                 else:
                     predictions = model(data)
 
@@ -150,8 +145,8 @@ def main(arg):
                     targets = targets.permute(0, 2, 1)
                     predictions = predictions.permute(0, 2, 1)
 
-                metrics.compute_and_save(predictions, targets, batch, i_batch, test_num)
-
+                out = metrics.compute_and_save(predictions, targets, batch, i_batch, test_num)
+                print(out)
 
 if __name__ == "__main__":
     app.run(main)
