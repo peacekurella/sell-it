@@ -108,12 +108,12 @@ class Metrics():
         buyer = haggling.denormalize_data(batch['buyer']['joints21'].cpu().numpy()[0])
 
         # get initRot and initTrans
-        initRotRightSeller = Quaternions.from_euler(batch['rightSeller']['initRot'][0].cpu().numpy())
-        initTransRightSeller = np.array(batch['rightSeller']['initTrans'][0].cpu().numpy())
-        initRotLeftSeller = Quaternions.from_euler(batch['leftSeller']['initRot'][0].cpu().numpy())
-        initTransLeftSeller = np.array(batch['leftSeller']['initTrans'][0].cpu().numpy())
-        initRotBuyer = Quaternions.from_euler(batch['buyer']['initRot'][0].cpu().numpy())
-        initTransBuyer = np.array(batch['buyer']['initTrans'][0].cpu().numpy())
+        initRotRightSeller = Quaternions(batch['rightSeller']['initRot'][0].cpu().numpy())
+        initTransRightSeller = batch['rightSeller']['initTrans'][0].cpu().numpy()
+        initRotLeftSeller = Quaternions(batch['leftSeller']['initRot'][0].cpu().numpy())
+        initTransLeftSeller = batch['leftSeller']['initTrans'][0].cpu().numpy()
+        initRotBuyer = Quaternions(batch['buyer']['initRot'][0].cpu().numpy())
+        initTransBuyer = batch['buyer']['initTrans'][0].cpu().numpy()
 
         prediction_subjects = [
             (r_prediction.copy(), initRotRightSeller, initTransRightSeller),
