@@ -23,7 +23,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing test files')
 flags.DEFINE_string('output_dir', 'Data/MVAEHoutput/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', 'ckpt/MVAE_MSI/ME', 'file containing the model weights')
+flags.DEFINE_string('ckpt', 'ckpt/MVAE/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.2, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder LSTM hidden units')
@@ -51,7 +51,7 @@ flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
 flags.DEFINE_integer('num_saves', 20, 'number of outputs to save')
-flags.DEFINE_integer('test_ckpt', 80, 'checkpoint to test')
+flags.DEFINE_integer('test_ckpt', None, 'checkpoint to test')
 flags.DEFINE_string('fmt', 'mann', 'data format')
 
 pss = lambda a, b: a == b

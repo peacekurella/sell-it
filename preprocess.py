@@ -287,9 +287,6 @@ class HoldenDataFormat:
         :return:
         """
 
-        # floor the positions
-        positions = HoldenDataFormat.floor_skelton(positions)
-
         # get root projection
         r_pjx = HoldenDataFormat.project_root(positions)
         positions = np.concatenate([r_pjx, positions], axis=1)

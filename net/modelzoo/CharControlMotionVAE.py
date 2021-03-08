@@ -132,16 +132,17 @@ class CharControlMotionVAE(nn.Module):
 
         # try to load the models
         # noinspection PyBroadException
+        epoch = enc_path.split('/')[-1]
+        epoch = int(epoch.split('.')[0])
         try:
             self.encoder.load_state_dict(torch.load(enc_path))
             self.decoder.load_state_dict(torch.load(dec_path))
             print("Load successful!")
-        except Exception as e:
-            print(e)
+        except:
             print("Load failed!")
-            return False
+            return 0
 
-        return True
+        return epoch
 
     def get_trainable_parameters(self):
         """

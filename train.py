@@ -224,13 +224,15 @@ def main(args):
 
     run = wandb.init(project=FLAGS.model, config=hyperparameter_defaults)
 
+    starting_epoch = 0
+
     # restore model if needed
     if FLAGS.resume_train:
         if FLAGS.pretrain:
             ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/AE/')
         else:
             ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/ME/')
-        model.load_model(ckpt, None)
+        starting_epoch = model.load_model(ckpt, None)
 
     # restore model partially if not pretraining
     if not FLAGS.pretrain:
@@ -247,7 +249,7 @@ def main(args):
     # wandb.watch(model)
 
     # run the training script
-    for epoch in range(1, FLAGS.epochs + 1):
+    for epoch in range(starting_epoch + 1, FLAGS.epochs + 1):
 
         # initialize the total epoch loss values
         epoch_train_loss = 0.0
