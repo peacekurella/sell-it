@@ -17,6 +17,11 @@ class CharControlMotionVAE(nn.Module):
         self.encoder = MVAEencoder(FLAGS)
         self.decoder = MVAEdecoder(FLAGS)
         self.latent_dim = FLAGS.latent_dim
+        if FLAGS.speak:
+            self.speak = nn.Linear(FLAGS.output_dim, 1)
+            self.predict_speech = True
+        else:
+            self.predict_speech = False
 
     def reparameterize(self, mu, log_var):
         """
@@ -28,21 +33,27 @@ class CharControlMotionVAE(nn.Module):
         sample = mu + (eps * std)
         return sample
 
-    def forward(self, x, p):
+    def forward(self, inputs, p):
         """
         Defines forward pass for the ConvMotionTransform VAE
-        :param x : tuple containing (data, targets) of shape ((batch_size, f, 146),(batch, f, 73))
+        :param inputs : dictionary containing inputs of shape (batch_size, F, input_dim*2),
+        speaking_status (batch_size, F, 2)
         :param p: probability of teacher forcing
         :output : prediction for seller 2 of shape (batch_size, f, 73)
         """
 
         # unpack into individual sequences
-        x, y = x
+        x = inputs['trainx']
+        y = inputs['trainy']
+        speakx = inputs['speakx']
+        speaky = inputs['speaky']
 
         # keep track of outputs
-        pred = [torch.unsqueeze(y[:, 0, :], dim=1)]
+        pose_pred = [torch.unsqueeze(y[:, 0, :], dim=1)]
+        speech_pred = [torch.unsqueeze(speaky[:, 0, :], dim=1)]
         mus = []
         log_vars = []
+        output = {}
 
         # scheduled teacher forcing
         if self.training:
@@ -56,7 +67,7 @@ class CharControlMotionVAE(nn.Module):
             if teacher_forcing:
                 inp = torch.cat([x[:, t, :], y[:, t - 1, :], y[:, t, :]], dim=1)
             else:
-                inp = torch.cat([x[:, t, :], torch.squeeze(pred[-1], dim=1), y[:, t, :]], dim=1)
+                inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1), y[:, t, :]], dim=1)
 
             if self.training:
                 mu, log_var = self.encoder(inp)
@@ -68,17 +79,30 @@ class CharControlMotionVAE(nn.Module):
             else:
                 z = torch.randn((x.shape[0], self.latent_dim)).cuda()
 
+            # adding conditions to the latent dimension
+            z = torch.cat((z, speakx[:, t], speaky[:, t-1]), dim=-1)
+
             # do the decoding
             if teacher_forcing:
                 inp = torch.cat([x[:, t, :], y[:, t - 1, :]], dim=1)
             else:
-                inp = torch.cat([x[:, t, :], torch.squeeze(pred[-1], dim=1)], dim=1)
+                inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1)], dim=1)
 
-            pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
+            pose_pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
+
+            if self.predict_speech:
+                speech_pred.append(self.speak(pose_pred[-1].squeeze(1)).unsqueeze(1))
+
+        output['pose_pred'] = torch.cat(pose_pred, dim=1)
 
         if self.training:
-            return torch.cat(pred, dim=1), torch.cat(mus, dim=1), torch.cat(log_vars, dim=1)
-        return torch.cat(pred, dim=1)
+            output['mus'] = torch.cat(mus, dim=1)
+            output['log_vars'] = torch.cat(log_vars, dim=1)
+
+        if self.predict_speech:
+            output['speech_pred'] = torch.cat(speech_pred, dim=1)
+
+        return output
 
     def save_model(self, path, epoch):
         """

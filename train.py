@@ -28,9 +28,9 @@ flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train file
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 
-flags.DEFINE_integer('batch_size', 16, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 80, 'Training epochs')
-flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
+flags.DEFINE_integer('batch_size', 48, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 400, 'Training epochs')
+flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder hidden units')
@@ -38,7 +38,7 @@ flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
 flags.DEFINE_integer('gat_hidden_units', 256, 'Gating network hidden units')
 flags.DEFINE_integer('enc_layers', 3, 'encoder layers')
 flags.DEFINE_integer('dec_layers', 1, 'decoder layers')
-flags.DEFINE_integer('num_experts', 3, 'number of experts in  decoder')
+flags.DEFINE_integer('num_experts', 8, 'number of experts in  decoder')
 flags.DEFINE_float('enc_dropout', 0.25, 'encoder dropout')
 flags.DEFINE_float('dec_dropout', 0.25, 'decoder dropout')
 flags.DEFINE_float('gat_dropout', 0.25, 'gating network dropout')
@@ -48,6 +48,9 @@ flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
 flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
+flags.DEFINE_integer('c_dim', 3, 'number of conditional variables added to latent dimension')
+flags.DEFINE_bool('speak', True, 'speak classification required')
+flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
@@ -69,6 +72,9 @@ def get_inputs(batch):
     b = batch['buyer']['joints21']
     l = batch['leftSeller']['joints21']
     r = batch['rightSeller']['joints21']
+    speaking_status = {'buyer': batch['buyer']['speakingStatus'],
+                       'leftSeller': batch['leftSeller']['speakingStatus'],
+                       'rightSeller': batch['rightSeller']['speakingStatus']}
 
     if FLAGS.pretrain:
         if FLAGS.CNN:
@@ -91,7 +97,17 @@ def get_inputs(batch):
             set_x_b = torch.cat((b, r), dim=2)
             train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
             train_y = torch.cat((r, l), dim=0).float().cuda()
-            return train_x, train_y
+            speak_a = torch.cat((speaking_status['buyer'], speaking_status['leftSeller']), dim=2)
+            speak_b = torch.cat((speaking_status['buyer'], speaking_status['rightSeller']), dim=2)
+            speak_x = torch.cat((speak_a, speak_b), dim=0).float().cuda()
+            speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float().cuda()
+            input = {
+                'trainx': train_x,
+                'trainy': train_y,
+                'speakx': speak_x,
+                'speaky': speak_y,
+            }
+            return input
 
 
 def get_model():
@@ -157,8 +173,8 @@ def decay_p(p, epoch):
     :param epoch: current epoch
     """
     if FLAGS.start_scheduled_sampling < epoch / FLAGS.epochs < FLAGS.end_scheduled_sampling:
-        num_epochs_decay = (FLAGS.end_scheduled_sampling - FLAGS.start_scheduled_sampling)*FLAGS.epochs
-        p -= 1/num_epochs_decay
+        num_epochs_decay = (FLAGS.end_scheduled_sampling - FLAGS.start_scheduled_sampling) * FLAGS.epochs
+        p -= 1 / num_epochs_decay
     elif epoch / FLAGS.epochs > FLAGS.end_scheduled_sampling:
         p = 0
 
@@ -256,6 +272,7 @@ def main(args):
         epoch_train_rec_loss = 0.0
         epoch_train_reg_loss = 0.0
         epoch_val_loss = 0.0
+        epoch_speech_loss = 0.0
 
         # set model to train mode
         model.train()
@@ -269,29 +286,31 @@ def main(args):
             optimizer.zero_grad()
 
             # get train input and labels
-            data, targets = get_inputs(batch)
+            inputs = get_inputs(batch)
 
             # forward pass through the network
             if FLAGS.VAE:
-                data = (data, targets)
-                predictions = model(data, p)
+                predictions = model(inputs, p)
             else:
-                predictions = model(data)
+                predictions = model(inputs)
 
             # calculate loss
-            total_loss, rec_loss, reg_loss = criterion(predictions, targets, model.parameters(), FLAGS.lmd)
+            losses = criterion(predictions, inputs, model.parameters(), FLAGS)
+
+            total_loss = losses['total_loss']
+            rec_loss = losses['loss_mse']
+            reg_loss = losses['loss_kld']
+            speech_loss = losses['loss_speech']
 
             epoch_train_loss += total_loss.detach().item()
             epoch_train_rec_loss += rec_loss.detach().item()
-            del rec_loss
             epoch_train_reg_loss += reg_loss.detach().item()
-            del reg_loss
+            epoch_speech_loss += speech_loss.detach().item()
             count_train += 1
 
             # calculate gradients
             total_loss.backward()
             optimizer.step()
-            del total_loss
 
         # set the model to evaluation mode
         model.eval()
@@ -301,31 +320,36 @@ def main(args):
             count_test = 0
             for i_batch, batch in enumerate(test_dataloader):
                 # get train input and labels
-                data, targets = get_inputs(batch)
+                inputs = get_inputs(batch)
 
                 # forward pass through the network
                 if FLAGS.VAE:
-                    data = (data, targets)
-                    predictions = model(data, p)
+                    predictions = model(inputs, p)
                 else:
-                    predictions = model(data)
+                    predictions = model(inputs)
 
                 # calculate loss
-                val_loss = meanJointPoseError(predictions, targets)
-                epoch_val_loss += val_loss.detach().item()
+                val_loss = meanJointPoseError(predictions, inputs)
+                epoch_val_loss += val_loss['total_loss'].detach().item()
                 del val_loss
                 count_test += 1
 
         # log the metrics
-        losses = {'train_total_loss': epoch_train_loss / count_train,
-                  'train_rec_loss': epoch_train_rec_loss / count_train,
-                  'train_reg_loss': epoch_train_reg_loss / count_train,
-                  'val_loss': epoch_val_loss / count_test}
+        losses = {
+            'train_total_loss': epoch_train_loss / count_train,
+            'train_rec_loss': epoch_train_rec_loss / count_train,
+            'train_reg_loss': epoch_train_reg_loss / count_train,
+            'train_speech_loss': epoch_speech_loss/ count_train,
+            'val_loss': epoch_val_loss / count_test
+        }
+
         print(losses)
+
         wandb.log({
             'train_total_loss': epoch_train_loss / count_train,
             'train_rec_loss': epoch_train_rec_loss / count_train,
             'train_reg_loss': epoch_train_reg_loss / count_train,
+            'train_speech_loss': epoch_speech_loss / count_train,
             'val_loss': epoch_val_loss / count_test
         })
 

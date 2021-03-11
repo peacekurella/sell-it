@@ -62,10 +62,13 @@ class HagglingDataset(Dataset):
             joints21 = joints21 - self.mean
             joints21 = np.divide(joints21, self.std)
 
+            speakingstatus = data[subject]['speechData']
+
             transformed_data[subject] = {
                 'initRot': np.array(initRot),
                 'initTrans': np.array(initTrans),
                 'joints21': joints21,
+                'speakingStatus': speakingstatus,
             }
 
         return transformed_data

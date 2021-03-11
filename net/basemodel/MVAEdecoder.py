@@ -20,9 +20,9 @@ class MVAEdecoder(nn.Module):
         for _ in range(self.num_experts):
             self.experts.append(
                 nn.ModuleList([
-                    nn.Linear((FLAGS.input_dim * 3) + FLAGS.latent_dim, FLAGS.dec_hidden_units),
-                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim, FLAGS.dec_hidden_units),
-                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim, FLAGS.dec_hidden_units),
+                    nn.Linear((FLAGS.input_dim * 3) + FLAGS.latent_dim + FLAGS.c_dim, FLAGS.dec_hidden_units),
+                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim + FLAGS.c_dim, FLAGS.dec_hidden_units),
+                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim + FLAGS.c_dim, FLAGS.dec_hidden_units),
                     nn.Linear(FLAGS.dec_hidden_units, FLAGS.output_dim)
                 ])
             )
@@ -42,7 +42,6 @@ class MVAEdecoder(nn.Module):
         :param z: random variable
         :return: output
         """
-
         bc = self.gatingNet(x, z).T  # > num_experts * batch_size
         bc = torch.unsqueeze(torch.unsqueeze(bc, dim=-1), dim=-1)  # > num_experts * batch_size * 1 * 1
 

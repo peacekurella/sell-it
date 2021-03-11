@@ -31,9 +31,10 @@ def meanJointPoseError(predictions, targets):
     :param targets: ground truths
     :return: average loss for the predicition
     """
-
+    pose_pred = predictions['pose_pred']
+    pose_gt = targets['trainy']
     loss = nn.MSELoss(reduction='mean')
-    return loss(predictions, targets)
+    return loss(pose_pred, pose_gt)
 
 
 def reconstruction_VAE(predictions, target, model_params, lmd):
@@ -60,7 +61,7 @@ def reconstruction_VAE(predictions, target, model_params, lmd):
 
     return loss_mse + lmd*loss_kld + 0.1*loss_cycle, loss_mse, loss_kld
 
-def sequential_reconstruction_VAE(predictions, target, model_params, lmd):
+def sequential_reconstruction_VAE(predictions, target, model_params, FLAGS):
     """
     Returns the reconstruction and KL divergence loss
     :param predictions: predictions from the network
@@ -73,15 +74,35 @@ def sequential_reconstruction_VAE(predictions, target, model_params, lmd):
     del model_params
 
     # unpack the predictions
-    predictions, mu, log_var = predictions
+    pose_pred = predictions['pose_pred']
+    mu = predictions['mus']
+    log_var = predictions['log_vars']
+    if FLAGS.speak:
+        speech_pred = predictions['speech_pred']
 
+    lmd = FLAGS.lmd
+
+    lmd2 = FLAGS.lmd2
+
+    loss_speech = torch.zeros(1).cuda()
     # set the criterion objects for mse
-    criterion1 = nn.MSELoss(reduction='mean')
+    criterion1 = nn.SmoothL1Loss(reduction='mean')
 
     # calculate the reconstruction loss
-    loss_mse = criterion1(predictions, target)
+    loss_mse = criterion1(pose_pred, target['trainy'])
 
     # calculate the KL Divergence loss
     loss_kld = torch.mean(torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
 
-    return loss_mse + ( lmd * loss_kld ), loss_mse, loss_kld
+    if FLAGS.speak:
+        criterion2 = nn.BCEWithLogitsLoss(reduction='mean')
+        loss_speech = criterion2(speech_pred, target['speaky'])
+
+    losses = {
+        'total_loss': loss_mse + (lmd * loss_kld) + (lmd2 * loss_speech),
+        'loss_kld': loss_kld,
+        'loss_speech': loss_speech,
+        'loss_mse': loss_mse,
+    }
+
+    return losses
