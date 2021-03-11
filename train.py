@@ -330,7 +330,7 @@ def main(args):
 
                 # calculate loss
                 val_loss = meanJointPoseError(predictions, inputs)
-                epoch_val_loss += val_loss['total_loss'].detach().item()
+                epoch_val_loss += val_loss.detach().item()
                 del val_loss
                 count_test += 1
 
