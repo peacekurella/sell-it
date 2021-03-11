@@ -26,7 +26,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('ckpt_dir', 'ckpt_new/', 'Directory to store checkpoints')
+
 
 flags.DEFINE_integer('batch_size', 48, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 400, 'Training epochs')
@@ -60,7 +61,7 @@ flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
-flags.DEFINE_integer('ckpt', 1, 'Number of epochs to checkpoint')
+flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
 def get_inputs(batch):
