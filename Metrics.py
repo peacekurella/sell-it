@@ -101,9 +101,9 @@ class Metrics():
         # separate right and left seller
         haggling = self.haggling
 
-        r_target = haggling.denormalize_data(targets[0].cpu().numpy())
+        r_target = haggling.denormalize_data(targets['trainy'][0].cpu().numpy())
         r_prediction = haggling.denormalize_data(predictions[0].cpu().numpy())
-        l_target = haggling.denormalize_data(targets[1].cpu().numpy())
+        l_target = haggling.denormalize_data(targets['trainy'][1].cpu().numpy())
         l_prediction = haggling.denormalize_data(predictions[1].cpu().numpy())
         buyer = haggling.denormalize_data(batch['buyer']['joints21'].cpu().numpy()[0])
 
@@ -148,7 +148,7 @@ class Metrics():
         vis.create_animation(skel, file_location + '/' + role)
 
     def compute_and_save(self, predictions, targets, batch, i_batch, test_num):
-        predictions, targets = self.split_into_subjects(predictions, targets, batch)
+        predictions, targets = self.split_into_subjects(predictions['pose_pred'], targets, batch)
 
         predictions = self.get_global_positions(predictions)
         targets = self.get_global_positions(targets)

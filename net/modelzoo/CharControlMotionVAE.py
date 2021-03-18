@@ -80,7 +80,7 @@ class CharControlMotionVAE(nn.Module):
                 z = torch.randn((x.shape[0], self.latent_dim)).cuda()
 
             # adding conditions to the latent dimension
-            z = torch.cat((z, speakx[:, t], speaky[:, t-1]), dim=-1)
+            z = torch.cat((z, speakx[:, t, 1]), dim=-1)
 
             # do the decoding
             if teacher_forcing:
