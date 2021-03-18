@@ -22,7 +22,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', 'Data/MVAEHoutput/', 'Folder to store final videos')
+flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 flags.DEFINE_string('ckpt', 'ckpt/MVAE/ME', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.2, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
@@ -41,6 +41,10 @@ flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
 flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
+flags.DEFINE_integer('c_dim', 3, 'number of conditional variables added to latent dimension')
+flags.DEFINE_bool('speak', True, 'speak classification required')
+flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
+
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'input pose vector dimension')
@@ -51,7 +55,7 @@ flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
 flags.DEFINE_integer('num_saves', 20, 'number of outputs to save')
-flags.DEFINE_integer('test_ckpt', None, 'checkpoint to test')
+flags.DEFINE_integer('test_ckpt', 180, 'checkpoint to test')
 flags.DEFINE_string('fmt', 'mann', 'data format')
 
 pss = lambda a, b: a == b
@@ -66,6 +70,9 @@ def get_input(batch):
     b = batch['buyer']['joints21']
     l = batch['leftSeller']['joints21']
     r = batch['rightSeller']['joints21']
+    speaking_status = {'buyer': batch['buyer']['speakingStatus'],
+                       'leftSeller': batch['leftSeller']['speakingStatus'],
+                       'rightSeller': batch['rightSeller']['speakingStatus']}
 
     if FLAGS.pretrain:
         if FLAGS.CNN:
@@ -88,7 +95,17 @@ def get_input(batch):
             set_x_b = torch.cat((b, r), dim=2)
             train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
             train_y = torch.cat((r, l), dim=0).float().cuda()
-            return train_x, train_y
+            speak_a = torch.cat((speaking_status['buyer'], speaking_status['leftSeller']), dim=2)
+            speak_b = torch.cat((speaking_status['buyer'], speaking_status['rightSeller']), dim=2)
+            speak_x = torch.cat((speak_a, speak_b), dim=0).float().cuda()
+            speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float().cuda()
+            input = {
+                'trainx': train_x,
+                'trainy': train_y,
+                'speakx': speak_x,
+                'speaky': speak_y,
+            }
+            return input
 
 
 def get_model():
@@ -132,20 +149,19 @@ def main(arg):
             for test_num in range(0, batch_runs):
 
                 # get test input and labels
-                data, targets = get_input(batch)
+                inputs = get_input(batch)
 
                 # forward pass through the network
                 if FLAGS.VAE:
-                    data = (data, targets)
-                    predictions = model(data, 0)
+                    predictions = model(inputs, 0.0)
                 else:
-                    predictions = model(data)
+                    predictions = model(inputs)
 
-                if FLAGS.CNN:
-                    targets = targets.permute(0, 2, 1)
-                    predictions = predictions.permute(0, 2, 1)
+                # if FLAGS.CNN:
+                #     targets = targets.permute(0, 2, 1)
+                #     predictions = predictions.permute(0, 2, 1)
 
-                out = metrics.compute_and_save(predictions, targets, batch, i_batch, test_num)
+                out = metrics.compute_and_save(predictions, inputs, batch, i_batch, test_num)
                 print(out)
 
 if __name__ == "__main__":
