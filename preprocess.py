@@ -1,4 +1,7 @@
 import sys
+
+from DebugVisualizer import DebugVisualizer
+
 sys.path.append("motion")
 import os
 import numpy as np
@@ -19,8 +22,8 @@ flags.DEFINE_string('bodyData', 'HagglingData/', 'Input folder containing source
 flags.DEFINE_string('faceData', None, 'Input folder containing source pickle files')
 flags.DEFINE_string('speechData', 'HagglingSpeechData/', 'Input folder containing speech annotations')
 flags.DEFINE_string('retData', 'Retargeted/', 'Intermediate output folder')
-flags.DEFINE_string('output', 'HoldenData/', 'Output folder to place new files')
-flags.DEFINE_string('format', 'holden', 'Data format to export')
+flags.DEFINE_string('output', 'FrechetData/', 'Output folder to place new files')
+flags.DEFINE_string('format', 'frechet', 'Data format to export')
 
 flags.DEFINE_integer('window_size', 120, 'Number of frames in one window')
 flags.DEFINE_integer('step_size', 10, 'window step size')
@@ -847,6 +850,150 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
         pickle.dump(stds, handle)
 
 
+def export_frechet_animation(positions, vis):
+    humanSkeleton = vis.humanSkeleton
+
+    directions = np.zeros((positions.shape[0], len(humanSkeleton), 3))
+
+    for idx, bone in enumerate(humanSkeleton):
+        directions[:, idx, :] = positions[:, bone[1], :] - positions[:, bone[0], :]
+
+    directions = directions.reshape((directions.shape[0], directions.shape[1]*directions.shape[2]))
+
+    return directions, positions
+
+
+def export_frechet_data(input_directory, output_directory, window_length, stride):
+    """
+        exports the data in the format for training Frechet net
+        :param input_directory: Input directory of retargeted skeletons
+        :param output_directory: Output directory
+        :return:
+    """
+    # load a list of all testing_files
+    test_list = open("meta/testing_files.json")
+    test_list = json.load(test_list)
+    test_list = test_list["file_names"]
+
+    # train count and test count
+    test_dir = os.path.join(output_directory, 'test')
+    if not os.path.isdir(test_dir):
+        os.makedirs(test_dir)
+
+    train_dir = os.path.join(output_directory, 'train')
+    if not os.path.isdir(train_dir):
+        os.makedirs(train_dir)
+
+    stats_dir = os.path.join(output_directory, 'stats')
+    if not os.path.isdir(stats_dir):
+        os.makedirs(stats_dir)
+
+    train, test = 0, 0
+
+    joints_21 = []
+    faces = []
+
+    vis = DebugVisualizer()
+
+    # go through all files
+    for file in os.listdir(input_directory):
+
+        print(file.split('.')[0])
+
+        # read the pkl file
+        with open(os.path.join(input_directory, file), "rb") as handle:
+            retargeted_data = pickle.load(handle, encoding='Latin-1')
+
+        # set num frames
+        num_frames = len(retargeted_data['buyer']['bodyData'][0])
+
+        # sanity check
+        if len(list(retargeted_data.keys())) < 3:
+            print(file, retargeted_data.keys())
+
+        # windowing through the sequence
+        for idx in range(0, num_frames, stride):
+
+            output_window = {}
+
+            for role in retargeted_data:
+
+                positions, bodyNormal, faceNormal = retargeted_data[role]['bodyData']
+                faceData = retargeted_data[role]['faceData'][idx + 1: idx + window_length]
+                if len(faceData.shape) > 2:
+                    faceData = faceData.reshape(faceData.shape[0], -1)
+                speechData = retargeted_data[role]['speechData'][:, np.newaxis][idx + 1: idx + window_length]
+
+                # dont do anything if more than 95% of the window needs padding
+                if positions[idx: idx + window_length].shape[0] <= 0.95 * window_length:
+                    continue
+
+                anim, positions = export_frechet_animation(positions[idx: idx + window_length], vis)
+
+                # pad if needed
+                if anim.shape[0] < window_length:
+                    # set the padding length
+                    pad_length = window_length - anim.shape[0]
+
+                    # pad the outputs
+                    anim = np.concatenate([anim, np.zeros((pad_length, anim.shape[1]))], axis=0)
+                    faceData = np.concatenate([faceData, np.zeros((pad_length, faceData.shape[1]))], axis=0)
+                    speechData = np.concatenate([speechData, np.zeros((pad_length, speechData.shape[1]))], axis=0)
+
+                if file not in test_list:
+                    joints_21.append(anim)
+                    faces.append(faceData)
+
+                output_window[role] = {
+                    'joints21': anim,
+                    'positions':positions,
+                    'faceData': faceData,
+                    'speechData': speechData,
+                    'bodyNormal': np.swapaxes(bodyNormal[:, idx + 1: idx + window_length + 1], 0, 1),
+                    'faceNormal': np.swapaxes(faceNormal[:, idx + 1: idx + window_length + 1], 0, 1)
+                }
+
+            if output_window:
+                if '_'.join(file.split('.')[0].split('_')[:-1]) in test_list:
+                    with open(os.path.join(test_dir, str(test) + '.pkl'), 'wb') as handle:
+                        pickle.dump(output_window, handle)
+                    test += 1
+                else:
+                    with open(os.path.join(train_dir, str(train) + '.pkl'), 'wb') as handle:
+                        pickle.dump(output_window, handle)
+                    train += 1
+
+    # calculate the stats
+    joints_21 = np.concatenate(joints_21, axis=0)
+    faces = np.concatenate(faces, axis=0)
+
+    bodyMean = np.mean(joints_21, axis=0)[np.newaxis, :]
+    bodyStd = np.std(joints_21, axis=0)[np.newaxis, :]
+    bodyStd[bodyStd == 0.0] = 1.0
+
+    faceMean = np.mean(faces, axis=0)[np.newaxis, :]
+    faceStd = np.std(faces, axis=0)[np.newaxis, :]
+    faceStd[faceStd == 0.0] = 1.0
+
+    means = {
+        'joints21': bodyMean,
+        'faceData': faceMean
+    }
+
+    stds = {
+        'joints21': bodyStd,
+        'faceData': faceStd
+    }
+
+    with open(os.path.join(stats_dir, 'mean.pkl'), 'wb') as handle:
+        pickle.dump(means, handle)
+
+    with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
+        pickle.dump(stds, handle)
+
+
+
+
 def main(args):
     # retarget skeletons if needed
     if not os.path.isdir(FLAGS.retData):
@@ -857,6 +1004,9 @@ def main(args):
 
     if FLAGS.format == 'mann':
         export_mann_data(FLAGS.retData, FLAGS.output, FLAGS.window_size, FLAGS.step_size)
+
+    if FLAGS.format == 'frechet':
+        export_frechet_data(FLAGS.retData, FLAGS.output, FLAGS.window_size, FLAGS.step_size)
 
 
 if __name__ == '__main__':
