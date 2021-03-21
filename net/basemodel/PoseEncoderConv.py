@@ -46,7 +46,7 @@ class PoseEncoderConv(nn.Module):
 
         self.out_net = nn.Sequential(
             # nn.Linear(864, 256),  # for 64 frames
-            nn.Linear(384, 256),  # for 34 frames
+            nn.Linear(1760, 256),  # for 34 frames
             nn.BatchNorm1d(256),
             nn.LeakyReLU(True),
             nn.Linear(256, 128),

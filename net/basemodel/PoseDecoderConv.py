@@ -20,18 +20,18 @@ class PoseDecoderConv(nn.Module):
             nn.Linear(feat_size, 256),
             nn.BatchNorm1d(256),
             nn.LeakyReLU(True),
-            nn.Linear(128, 256),
+            nn.Linear(256, length * 4),
         )
 
         self.net = nn.Sequential(
             nn.ConvTranspose1d(4, 32, 3),
             nn.BatchNorm1d(32),
             nn.LeakyReLU(0.2, True),
-            nn.ConvTranspose1d(32, 32, 3),
-            nn.BatchNorm1d(32),
+            nn.ConvTranspose1d(32, 64, 3),
+            nn.BatchNorm1d(64),
             nn.LeakyReLU(0.2, True),
-            nn.Conv1d(32, 32, 3),
-            nn.Conv1d(32, dim, 3),
+            nn.Conv1d(64, 128, 3),
+            nn.Conv1d(128, dim, 3),
         )
 
     def forward(self, feat, pre_poses=None):

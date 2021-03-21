@@ -1,26 +1,25 @@
 import time
 import sys
+import os
 import torch
+import torch.nn as nn
+import random
 import numpy as np
+
+sys.path.append("net")
+sys.path.append("net/modelzoo")
+sys.path.append("net/basemodel")
+
+from DebugVisualizer import DebugVisualizer
+from JointsDataset import JointsDataset
+
 [sys.path.append(i) for i in ['.', '..']]
 
 from torch import optim
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 import matplotlib
 
-from modelzoo import EmbeddingNet
-from HagglingDataset import HagglingDataset
-
-from train_eval.train_joint_embed import eval_embed
-from utils.average_meter import AverageMeter
-
-matplotlib.use('Agg')  # we don't use interactive GUI
-
-from config.parse_args import parse_args
-
-from data_loader.lmdb_data_loader import *
-import utils.train_utils
+from EmbeddingNet import EmbeddingNet
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -29,222 +28,147 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 
-
-def evaluate_testset(test_data_loader, generator):
-    # to evaluation mode
-    generator.train(False)
-
-    losses = AverageMeter('loss')
-    start = time.time()
-
-    with torch.no_grad():
-        for iter_idx, data in enumerate(test_data_loader, 0):
-            target_poses, target_vec = data
-            batch_size = target_vec.size(0)
-
-            target = target_vec.to(device)
-
-            loss, _ = eval_embed(None, None, None, target, generator)
-            losses.update(loss.item(), batch_size)
-
-    # back to training mode
-    generator.train(True)
-
-    # print
-    ret_dict = {'loss': losses.avg}
-    elapsed_time = time.time() - start
-    logging.info('[VAL] loss: {:.3f} / {:.1f}s'.format(losses.avg, elapsed_time))
-
-    return ret_dict
+flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
+flags.DEFINE_string('train', 'FrechetData/train/', 'Directory containing train files')
+flags.DEFINE_string('test', 'FrechetData/test/', 'Directory containing train files')
+flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('model', 'frechet', 'model type')
+flags.DEFINE_integer('batch_size', 48, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 400, 'Training epochs')
+flags.DEFINE_integer('nframes', 120, 'Window size in number of frames')
+flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate')
+flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
-def train_iter(args, epoch, target_data, net, optim):
-    # zero gradients
-    optim.zero_grad()
+def get_inputs(batch):
+    b = batch['buyer']['directions']
+    l = batch['leftSeller']['directions']
+    r = batch['rightSeller']['directions']
 
-    variational_encoding = False  # AE or VAE
+    trainx = torch.cat((b, l, r), dim=0).float().cuda()
 
-    # reconstruction loss
-    context_feat, context_mu, context_logvar, poses_feat, pose_mu, pose_logvar, recon_data = \
-        net(None, None, None, target_data, None, variational_encoding=variational_encoding)
+    return {'data':trainx, 'target': trainx}
 
-    recon_loss = F.l1_loss(recon_data, target_data, reduction='none')
-    recon_loss = torch.mean(recon_loss, dim=(1, 2))
+def reconstruction(predictions, targets):
+    """
+        Defines a reconstruction loss with L1 regularization loss
+        :param predictions: predcitions from the model
+        :param targets: ground truth targets
+        :param model_params: model params to calculate l1 loss over
+        :param lmd: smoothing parameter
+        :return: total loss for the predictions
+    """
 
-    if True:  # use pose diff
-        target_diff = target_data[:, 1:] - target_data[:, :-1]
-        recon_diff = recon_data[:, 1:] - recon_data[:, :-1]
-        recon_loss += torch.mean(F.l1_loss(recon_diff, target_diff, reduction='none'), dim=(1, 2))
+    # set the criterion objects
+    criterion1 = nn.MSELoss(reduction='mean')
 
-    recon_loss = torch.sum(recon_loss)
+    # calculate losses
+    mse = criterion1(predictions, targets)
 
-    # KLD
-    if variational_encoding:
-        if net.mode == 'speech':
-            KLD = -0.5 * torch.sum(1 + context_logvar - context_mu.pow(2) - context_logvar.exp())
-        else:
-            KLD = -0.5 * torch.sum(1 + pose_logvar - pose_mu.pow(2) - pose_logvar.exp())
-
-        if epoch < 10:
-            KLD_weight = 0
-        else:
-            KLD_weight = min(1.0, (epoch - 10) * 0.05)
-        recon_weight = 100
-        loss = recon_weight * recon_loss + KLD_weight * KLD
-    else:
-        recon_weight = 1
-        loss = recon_weight * recon_loss
-
-    loss.backward()
-    optim.step()
-
-    ret_dict = {'loss': recon_weight * recon_loss.item()}
-    if variational_encoding:
-        ret_dict['KLD'] = KLD_weight * KLD.item()
-    return ret_dict
+    return mse
 
 
-def main(config):
-    args = config['args']
+def get_loss_fn():
+    """
+    Returns the appropriate loss function for training
+    :return: loss function
+    """
+    return reconstruction
 
-    # random seed
-    if args.random_seed >= 0:
-        utils.train_utils.set_random_seed(args.random_seed)
+def reconstruct(predictions, batch, idx, num):
+    vis = DebugVisualizer()
+    skeleton = vis.humanSkeleton
 
-    # set logger
-    utils.train_utils.set_logger(args.model_save_path, os.path.basename(__file__).replace('.py', '.log'))
+    predictions = predictions.reshape((predictions.shape[0], predictions.shape[1], -1, 3))
+
+    keys = ['buyer', 'leftSeller', 'rightSeller']
+
+    skels_pred = []
+
+    skels_target = []
+
+    for i in range(3):
+        pred = predictions[i*FLAGS.batch_size + idx, :, :, :]
+        positions = batch[keys[i]]['positions'][idx, :, :, :]
+        new_skeleton = positions.copy()
+
+        for idx, bone in enumerate(skeleton):
+            new_skeleton[:, bone[1], :] = pred[:, idx, :] + new_skeleton[:, bone[0], :]
+
+        skels_pred.append(vis.conv_debug_visual_form(new_skeleton))
+
+        skels_target.append(vis.conv_debug_visual_form(positions))
+
+    skels = skels_target + skels_pred
+
+    vis.create_animation(skels, 'FrechetTest/'+str(num))
+
+
+def main(args):
 
     # initialize the dataset and the data loader
-    train_dataset = HagglingDataset(FLAGS.train, FLAGS)
+    train_dataset = JointsDataset(FLAGS.train, FLAGS)
     train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
-    test_dataset = HagglingDataset(FLAGS.test, FLAGS)
+    test_dataset = JointsDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
-    # dataset
-    # mean_dir_vec = np.squeeze(np.array(args.mean_dir_vec))
-    # path = 'data/h36m/data_3d_h36m.npz'  # from https://github.com/facebookresearch/VideoPose3D/blob/master/DATASETS.md
-    # train_dataset = Human36M(path, mean_dir_vec, is_train=True, augment=False)
-    # val_dataset = Human36M(path, mean_dir_vec, is_train=False, augment=False)
-    # train_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
-    # test_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False, drop_last=True)
-
     # train
-    pose_dim = 27  # 9 x 3
-    start = time.time()
-    loss_meters = [AverageMeter('loss'), AverageMeter('var_loss')]
-    best_val_loss = (1e+10, 0)  # value, epoch
-
-    # interval params
-    print_interval = int(len(train_loader) / 5)
-    save_sample_result_epoch_interval = 10
-    save_model_epoch_interval = 20
+    pose_dim = 42  # 9 x 3
 
     # init model and optimizer
-    generator = EmbeddingNet(args, pose_dim, args.n_poses, None, None, None, mode='pose').to(device)
-    gen_optimizer = optim.Adam(generator.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
+    model = EmbeddingNet(pose_dim, FLAGS.nframes).cuda()
+    criterion = get_loss_fn()
+    optimizer = optim.Adam(model.parameters(), lr=FLAGS.learning_rate, betas=(0.5, 0.999))
 
     # training
     global_iter = 0
     best_values = {}  # best values for all loss metrics
-    for epoch in range(args.epochs):
-        # evaluate the test set
-        val_metrics = evaluate_testset(test_loader, generator)
+    for epoch in range(FLAGS.epochs):
 
-        # best?
-        val_loss = val_metrics['loss']
-        is_best = val_loss < best_val_loss[0]
-        if is_best:
-            logging.info('  *** BEST VALIDATION LOSS: {:.3f}'.format(val_loss))
-            best_val_loss = (val_loss, epoch)
-        else:
-            logging.info('  best validation loss so far: {:.3f} at EPOCH {}'.format(best_val_loss[0], best_val_loss[1]))
+        total_train_loss = 0.0
+        total_val_loss = 0.0
 
-        # save model
-        if is_best or (epoch % save_model_epoch_interval == 0 and epoch > 0):
-            gen_state_dict = generator.state_dict()
+        model.train()
 
-            if is_best:
-                save_name = '{}/{}_checkpoint_best.bin'.format(args.model_save_path, args.name)
-                utils.train_utils.save_checkpoint({
-                    'args': args, 'epoch': epoch, 'pose_dim': pose_dim, 'gen_dict': gen_state_dict,
-                }, save_name)
+        for iter_idx, batch in enumerate(train_dataloader):
+            inputs = get_inputs(batch)
 
-        # save sample results
-        if args.save_result_video and epoch % save_sample_result_epoch_interval == 0:
-            evaluate_sample_and_save_video(epoch, args.name, test_loader, generator, args=args)
+            predictions, poses_feat, poses_mu, poses_logvar = model(inputs['data'])
 
-        # train iter
-        iter_start_time = time.time()
-        for iter_idx, (target_pose, target_vec) in enumerate(train_loader, 0):
-            global_iter += 1
-            batch_size = target_vec.size(0)
-            target_vec = target_vec.to(device)
+            loss = criterion(predictions, inputs['target'])
 
-            loss = train_iter(args, epoch, target_vec, generator, gen_optimizer)
+            total_train_loss += loss.detatch().item()
 
-            # loss values
-            for loss_meter in loss_meters:
-                name = loss_meter.name
-                if name in loss:
-                    loss_meter.update(loss[name], batch_size)
+            # calculate gradients
+            loss.backward()
+            optimizer.step()
 
-            # print training status
-            if (iter_idx + 1) % print_interval == 0:
-                print_summary = 'EP {} ({:3d}) | {:>8s}, {:.0f} samples/s | '.format(
-                    epoch, iter_idx + 1, utils.train_utils.time_since(start),
-                           batch_size / (time.time() - iter_start_time))
-                for loss_meter in loss_meters:
-                    if loss_meter.count > 0:
-                        print_summary += '{}: {:.3f}, '.format(loss_meter.name, loss_meter.avg)
-                        loss_meter.reset()
-                logging.info(print_summary)
+        # set the model to evaluation mode
+        model.eval()
 
-            iter_start_time = time.time()
+        # calculate validation loss
+        with torch.no_grad():
+            count = 0
+            for i_batch, batch in enumerate(test_dataloader):
+                # get train input and labels
+                inputs = get_inputs(batch)
 
-    # print best losses
-    logging.info('--------- best loss values ---------')
-    for key in best_values.keys():
-        logging.info('{}: {:.3f} at EPOCH {}'.format(key, best_values[key][0], best_values[key][1]))
+                # forward pass through the network
+                predictions, poses_feat, poses_mu, poses_logvar = model(inputs['data'])
+
+                # calculate loss
+                total_val_loss += reconstruction(predictions, inputs).detach().item()
+
+                if epoch % 100 == 0:
+                    if count < 5:
+                        rand = random.randrange(0, FLAGS.batch_size)
+                        reconstruct(predictions, batch, rand, epoch+count)
+                        count += 1
 
 
-def evaluate_sample_and_save_video(epoch, prefix, test_data_loader, generator, args, n_save=None, save_path=None):
-    generator.train(False)  # eval mode
-    start = time.time()
-    if not n_save:
-        n_save = 1 if epoch <= 0 else 5
-
-    with torch.no_grad():
-        for iter_idx, data in enumerate(test_data_loader, 0):
-            if iter_idx >= n_save:  # save N samples
-                break
-
-            _, target_dir_vec = data
-
-            # prepare
-            select_index = 20
-            target_dir_vec = target_dir_vec[select_index, :, :].unsqueeze(0).to(device)
-
-            # generation
-            _, _, _, _, _, _, out_dir_vec = generator(None, None, None, target_dir_vec, variational_encoding=False)
-
-            # to video
-            target_dir_vec = np.squeeze(target_dir_vec.cpu().numpy())
-            out_dir_vec = np.squeeze(out_dir_vec.cpu().numpy())
-
-            if save_path is None:
-                save_path = args.model_save_path
-
-            mean_data = np.array(args.mean_dir_vec).reshape(-1, 3)
-            utils.train_utils.create_video_and_save(
-                save_path, epoch, prefix, iter_idx,
-                target_dir_vec, out_dir_vec, mean_data, '')
-
-    generator.train(True)  # back to training mode
-    logging.info('saved sample videos, took {:.1f}s'.format(time.time() - start))
-
-    return True
-
+        if epoch % FLAGS.ckpt == 0:
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
+            model.save_model(ckpt, epoch)
 
 if __name__ == '__main__':
-    _args = parse_args()
-    main({'args': _args})
+    app.run(main)
