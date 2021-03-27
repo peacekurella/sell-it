@@ -21,8 +21,8 @@ class MVAEdecoder(nn.Module):
             self.experts.append(
                 nn.ModuleList([
                     nn.Linear((FLAGS.input_dim * 3) + FLAGS.latent_dim + FLAGS.c_dim, FLAGS.dec_hidden_units),
-                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim + FLAGS.c_dim, FLAGS.dec_hidden_units),
-                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim + FLAGS.c_dim, FLAGS.dec_hidden_units),
+                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim, FLAGS.dec_hidden_units),
+                    nn.Linear(FLAGS.dec_hidden_units + FLAGS.latent_dim, FLAGS.dec_hidden_units),
                     nn.Linear(FLAGS.dec_hidden_units, FLAGS.output_dim)
                 ])
             )

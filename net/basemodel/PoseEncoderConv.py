@@ -40,13 +40,14 @@ class PoseEncoderConv(nn.Module):
         self.net = nn.Sequential(
             ConvNormRelu(dim, 32, batchnorm=True),
             ConvNormRelu(32, 64, batchnorm=True),
-            ConvNormRelu(64, 64, True, batchnorm=True),
+            ConvNormRelu(64, 128, True, batchnorm=True),
+            ConvNormRelu(128, 64, True, batchnorm=True),
             nn.Conv1d(64, 32, 3)
         )
 
         self.out_net = nn.Sequential(
             # nn.Linear(864, 256),  # for 64 frames
-            nn.Linear(1760, 256),  # for 34 frames
+            nn.Linear(800, 256),  # for 34 frames
             nn.BatchNorm1d(256),
             nn.LeakyReLU(True),
             nn.Linear(256, 128),

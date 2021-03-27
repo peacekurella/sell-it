@@ -17,7 +17,6 @@ from JointsDataset import JointsDataset
 
 from torch import optim
 from torch.utils.data import DataLoader
-import matplotlib
 
 from EmbeddingNet import EmbeddingNet
 
@@ -33,21 +32,26 @@ flags.DEFINE_string('train', 'FrechetData/train/', 'Directory containing train f
 flags.DEFINE_string('test', 'FrechetData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 flags.DEFINE_string('model', 'frechet', 'model type')
-flags.DEFINE_integer('batch_size', 48, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 400, 'Training epochs')
+flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 1000, 'Training epochs')
 flags.DEFINE_integer('nframes', 120, 'Window size in number of frames')
-flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate')
+flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
-def get_inputs(batch):
+def get_inputs(batch, is_training):
     b = batch['buyer']['directions']
     l = batch['leftSeller']['directions']
     r = batch['rightSeller']['directions']
 
-    trainx = torch.cat((b, l, r), dim=0).float().cuda()
+    trainx = torch.cat((b, l, r), dim=0).float()
+    if is_training:
+        trainx = (trainx + (0.1**0.5)*torch.randn(trainx.shape)).cuda()
+    else:
+        trainx = trainx.cuda()
 
-    return {'data':trainx, 'target': trainx}
+    return {'data': trainx, 'target': trainx}
+
 
 def reconstruction(predictions, targets):
     """
@@ -75,10 +79,11 @@ def get_loss_fn():
     """
     return reconstruction
 
-def reconstruct(predictions, batch, idx, num):
+
+def reconstruct(predictions, batch, idx, num, dataset):
     vis = DebugVisualizer()
     skeleton = vis.humanSkeleton
-
+    predictions = dataset.denormalize_data(predictions.cpu().numpy())
     predictions = predictions.reshape((predictions.shape[0], predictions.shape[1], -1, 3))
 
     keys = ['buyer', 'leftSeller', 'rightSeller']
@@ -88,8 +93,8 @@ def reconstruct(predictions, batch, idx, num):
     skels_target = []
 
     for i in range(3):
-        pred = predictions[i*FLAGS.batch_size + idx, :, :, :]
-        positions = batch[keys[i]]['positions'][idx, :, :, :]
+        pred = predictions[i * FLAGS.batch_size + idx, :, :, :]
+        positions = batch[keys[i]]['positions'][idx, :, :, :].cpu().numpy()
         new_skeleton = positions.copy()
 
         for idx, bone in enumerate(skeleton):
@@ -101,11 +106,10 @@ def reconstruct(predictions, batch, idx, num):
 
     skels = skels_target + skels_pred
 
-    vis.create_animation(skels, 'FrechetTest/'+str(num))
+    vis.create_animation(skels, 'FrechetTest/' + str(num))
 
 
 def main(args):
-
     # initialize the dataset and the data loader
     train_dataset = JointsDataset(FLAGS.train, FLAGS)
     train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=True, num_workers=10)
@@ -121,23 +125,25 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=FLAGS.learning_rate, betas=(0.5, 0.999))
 
     # training
-    global_iter = 0
-    best_values = {}  # best values for all loss metrics
-    for epoch in range(FLAGS.epochs):
 
+    for epoch in range(FLAGS.epochs):
+        training = True
         total_train_loss = 0.0
         total_val_loss = 0.0
 
         model.train()
 
         for iter_idx, batch in enumerate(train_dataloader):
-            inputs = get_inputs(batch)
+            # zero prev gradients
+            optimizer.zero_grad()
+
+            inputs = get_inputs(batch, training)
 
             predictions, poses_feat, poses_mu, poses_logvar = model(inputs['data'])
 
             loss = criterion(predictions, inputs['target'])
 
-            total_train_loss += loss.detatch().item()
+            total_train_loss += loss.detach().item()
 
             # calculate gradients
             loss.backward()
@@ -145,30 +151,32 @@ def main(args):
 
         # set the model to evaluation mode
         model.eval()
-
+        training = False
         # calculate validation loss
         with torch.no_grad():
             count = 0
             for i_batch, batch in enumerate(test_dataloader):
                 # get train input and labels
-                inputs = get_inputs(batch)
+                inputs = get_inputs(batch, training)
 
                 # forward pass through the network
                 predictions, poses_feat, poses_mu, poses_logvar = model(inputs['data'])
 
                 # calculate loss
-                total_val_loss += reconstruction(predictions, inputs).detach().item()
+                total_val_loss += reconstruction(predictions, inputs['target']).detach().item()
 
-                if epoch % 100 == 0:
+                if epoch % 100 == 0 and epoch > 0:
                     if count < 5:
                         rand = random.randrange(0, FLAGS.batch_size)
-                        reconstruct(predictions, batch, rand, epoch+count)
+                        reconstruct(predictions, batch, rand, epoch + count, test_dataset)
                         count += 1
 
+        print("Epoch: ", epoch, " Total train loss: ", total_train_loss, " Total validation loss: ", total_val_loss)
 
-        if epoch % FLAGS.ckpt == 0:
+        if epoch % FLAGS.ckpt == 0 and epoch > 0:
             ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
             model.save_model(ckpt, epoch)
+
 
 if __name__ == '__main__':
     app.run(main)

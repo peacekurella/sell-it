@@ -70,6 +70,7 @@ class CharControlMotionVAE(nn.Module):
                 inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1), y[:, t, :]], dim=1)
 
             if self.training:
+                inp = torch.cat((inp, speakx[:, t, :].unsqueeze(1)), dim=-1)
                 mu, log_var = self.encoder(inp)
                 mus.append(torch.unsqueeze(mu, dim=1))
                 log_vars.append(torch.unsqueeze(log_var, dim=1))
@@ -80,7 +81,7 @@ class CharControlMotionVAE(nn.Module):
                 z = torch.randn((x.shape[0], self.latent_dim)).cuda()
 
             # adding conditions to the latent dimension
-            z = torch.cat((z, speakx[:, t, 1].unsqueeze(1)), dim=-1)
+            # z = torch.cat((z, speakx[:, t, 1].unsqueeze(1)), dim=-1)
 
             # do the decoding
             if teacher_forcing:
@@ -88,6 +89,7 @@ class CharControlMotionVAE(nn.Module):
             else:
                 inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1)], dim=1)
 
+            inp = torch.cat((inp, speakx[:, t, :].unsqueeze(1)), dim=-1)
             pose_pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
 
             if self.predict_speech:

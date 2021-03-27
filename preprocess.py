@@ -715,11 +715,12 @@ class MannDataFormat(HoldenDataFormat):
         r_pjx[0] = initTrans
 
         for i in range(1, r_pjx.shape[0]):
-            r_pjx[i] += r_pjx[i-1]
+            r_pjx[i] += r_pjx[i - 1]
 
         joints = joint_positions + r_pjx
 
         return joints
+
 
 def export_mann_data(input_directory, output_directory, window_length, stride):
     """
@@ -858,9 +859,9 @@ def export_frechet_animation(positions, vis):
     for idx, bone in enumerate(humanSkeleton):
         directions[:, idx, :] = positions[:, bone[1], :] - positions[:, bone[0], :]
 
-    directions = directions.reshape((directions.shape[0], directions.shape[1]*directions.shape[2]))
+    directions = directions.reshape((directions.shape[0], directions.shape[1] * directions.shape[2]))
 
-    directions = filters.gaussian_filter1d(directions, 20, axis=0, mode='nearest')
+    # directions = filters.gaussian_filter1d(directions, 20, axis=0, mode='nearest')
 
     return directions, positions
 
@@ -939,7 +940,8 @@ def export_frechet_data(input_directory, output_directory, window_length, stride
 
                     # pad the outputs
                     anim = np.concatenate([anim, np.zeros((pad_length, anim.shape[1]))], axis=0)
-                    positions = np.concatenate([positions, np.zeros((pad_length, positions.shape[1], positions.shape[2]))], axis=0)
+                    positions = np.concatenate(
+                        [positions, np.zeros((pad_length, positions.shape[1], positions.shape[2]))], axis=0)
                     faceData = np.concatenate([faceData, np.zeros((pad_length, faceData.shape[1]))], axis=0)
                     speechData = np.concatenate([speechData, np.zeros((pad_length, speechData.shape[1]))], axis=0)
 
@@ -949,7 +951,7 @@ def export_frechet_data(input_directory, output_directory, window_length, stride
 
                 output_window[role] = {
                     'joints21': anim,
-                    'positions':positions,
+                    'positions': positions,
                     'faceData': faceData,
                     'speechData': speechData,
                     'bodyNormal': np.swapaxes(bodyNormal[:, idx + 1: idx + window_length + 1], 0, 1),
@@ -993,8 +995,6 @@ def export_frechet_data(input_directory, output_directory, window_length, stride
 
     with open(os.path.join(stats_dir, 'std.pkl'), 'wb') as handle:
         pickle.dump(stds, handle)
-
-
 
 
 def main(args):
