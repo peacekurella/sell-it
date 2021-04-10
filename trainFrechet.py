@@ -35,7 +35,7 @@ flags.DEFINE_string('model', 'frechet', 'model type')
 flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 1000, 'Training epochs')
 flags.DEFINE_integer('nframes', 120, 'Window size in number of frames')
-flags.DEFINE_float('learning_rate', 0.0005, 'Initial learning rate')
+flags.DEFINE_float('learning_rate', 0.0009, 'Initial learning rate')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
