@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch
 import glob
 
-from ConvEncoderDouble import ConvEncoderDouble
-from ConvDecoderSingle import ConvDecoderSingle
+from net.basemodel.ConvDecoderSingle import ConvDecoderSingle
+from net.basemodel.ConvEncoderDouble import ConvEncoderDouble
 
 
 class BodyMotionGenerator(nn.Module):
@@ -15,18 +15,37 @@ class BodyMotionGenerator(nn.Module):
         super(BodyMotionGenerator, self).__init__()
         self.encoder = ConvEncoderDouble(FLAGS)
         self.decoder = ConvDecoderSingle(FLAGS)
+        pretrained_ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.pretrainedModel + '/')
+
+        # set device
+        self.device = torch.device(FLAGS.device)
+
+        if not self.load_transfer_params(pretrained_ckpt, FLAGS.pretrained_ckpt):
+            raise Exception("bodyAE model needs to be trained")
 
     def forward(self, x):
         """
         Defines a forward pass through the Body Auto Encoder
-        :param x: Input vector of shape (batch_size, f, 146)
-        :return: output vector of shape (batch_size, f, 73)
+        :param x: Input vector of shape (batch_size, input_dim*2, f)
+        :return: output vector of shape (batch_size, output_dim, f)
         """
+        x, y = self.transform_inputs(x)
+        # set it to input device
+        x = x.to(self.device)
+        y = y.to(self.device)
 
         latent = self.encoder(x)
         out = self.decoder(latent)
 
-        return out
+        prediction = {
+            "pose": out
+        }
+
+        target = {
+            "pose": y
+        }
+
+        return prediction, target
 
     def save_model(self, path, epoch):
         """
@@ -129,3 +148,26 @@ class BodyMotionGenerator(nn.Module):
             return False
 
         return True
+
+    def transform_inputs(self, batch):
+        """
+        Transforms the input dictionary to
+        inputs for the model (batch , sequence_length, input_dim*2)
+        """
+        b = batch['buyer']['joints21']
+        l = batch['leftSeller']['joints21']
+        r = batch['rightSeller']['joints21']
+
+        # Input splitting
+        speaking_status = {
+            'buyer': batch['buyer']['speakingStatus'],
+            'leftSeller': batch['leftSeller']['speakingStatus'],
+            'rightSeller': batch['rightSeller']['speakingStatus']
+        }
+
+        set_x_a = torch.cat((b, l), dim=2)
+        set_x_b = torch.cat((b, r), dim=2)
+        train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float()
+        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float()
+
+        return train_x, train_y

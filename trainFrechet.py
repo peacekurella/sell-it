@@ -35,7 +35,7 @@ flags.DEFINE_string('model', 'frechet', 'model type')
 flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 1000, 'Training epochs')
 flags.DEFINE_integer('nframes', 120, 'Window size in number of frames')
-flags.DEFINE_float('learning_rate', 0.0001, 'Initial learning rate')
+flags.DEFINE_float('learning_rate', 0.0009, 'Initial learning rate')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 
 
@@ -117,7 +117,7 @@ def main(args):
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
     # train
-    pose_dim = 42  # 9 x 3
+    pose_dim = 42  # 14 x 3
 
     # init model and optimizer
     model = EmbeddingNet(pose_dim, FLAGS.nframes).cuda()

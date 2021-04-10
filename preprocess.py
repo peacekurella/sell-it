@@ -703,19 +703,19 @@ class MannDataFormat(HoldenDataFormat):
         :param initRot: initial normal direction of the body
         :param initTrans: initial position of the root projection
         """
-        r_vel, joint_positions = processed[:, :2], processed[:, 6:69]
+        r_vel, joint_positions = processed[:, :, :2], processed[:, :, 6:69]
 
-        joint_positions = np.reshape(joint_positions, (joint_positions.shape[0], -1, 3))
+        joint_positions = np.reshape(joint_positions, (joint_positions.shape[0], joint_positions.shape[1], -1, 3))
 
-        initTrans = np.reshape(initTrans, (-1, 3))
-        r_vel = np.insert(r_vel, 1, 0, axis=1)
-        r_vel = np.reshape(r_vel, (r_vel.shape[0], 1, -1))
+        initTrans = np.reshape(initTrans, (initTrans.shape[0], -1, 3))
+        r_vel = np.insert(r_vel, 1, 0, axis=2)
+        r_vel = np.reshape(r_vel, (r_vel.shape[0], r_vel.shape[1], 1, -1))
 
         r_pjx = r_vel.copy()
-        r_pjx[0] = initTrans
+        r_pjx[:, 0] = initTrans
 
-        for i in range(1, r_pjx.shape[0]):
-            r_pjx[i] += r_pjx[i - 1]
+        for i in range(1, r_pjx.shape[1]):
+            r_pjx[:, i] += r_pjx[:, i - 1]
 
         joints = joint_positions + r_pjx
 
@@ -854,12 +854,12 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
 def export_frechet_animation(positions, vis):
     humanSkeleton = vis.humanSkeleton
 
-    directions = np.zeros((positions.shape[0], len(humanSkeleton), 3))
+    directions = np.zeros((positions.shape[0], positions.shape[1], len(humanSkeleton), 3))
 
     for idx, bone in enumerate(humanSkeleton):
-        directions[:, idx, :] = positions[:, bone[1], :] - positions[:, bone[0], :]
+        directions[:, :, idx, :] = positions[:, :, bone[1], :] - positions[:, :, bone[0], :]
 
-    directions = directions.reshape((directions.shape[0], directions.shape[1] * directions.shape[2]))
+    directions = directions.reshape((directions.shape[0], directions.shape[1],  directions.shape[2] * directions.shape[3]))
 
     # directions = filters.gaussian_filter1d(directions, 20, axis=0, mode='nearest')
 

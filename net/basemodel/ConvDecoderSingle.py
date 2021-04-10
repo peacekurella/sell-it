@@ -12,7 +12,7 @@ class ConvDecoderSingle(nn.Module):
         super(ConvDecoderSingle, self).__init__()
         self.network = nn.Sequential(
             nn.Dropout(0.25),
-            nn.ConvTranspose1d(256, 73, 25, stride=2, padding=12, output_padding=1),
+            nn.ConvTranspose1d(256, FLAGS.output_dim, 25, stride=2, padding=12, output_padding=1),
         )
 
     def forward(self, x):

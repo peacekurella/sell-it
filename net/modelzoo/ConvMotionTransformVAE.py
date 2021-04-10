@@ -3,9 +3,9 @@ import torch
 import glob
 import torch.nn as nn
 
-from ConvDecoderSingle import ConvDecoderSingle
-from ConvEncoderSingle import ConvEncoderSingle
-from LatentParameterizer import LatentPatameterizer
+from net.basemodel.ConvDecoderSingle import ConvDecoderSingle
+from net.basemodel.ConvEncoderSingle import ConvEncoderSingle
+from net.basemodel.LatentParameterizer import LatentParameterizer
 
 
 class ConvMotionTransformVAE(nn.Module):
@@ -21,11 +21,17 @@ class ConvMotionTransformVAE(nn.Module):
 
         self.encoder_output_dimensions = self.encoder_b.get_output_dimensions(FLAGS)
         self.resnet_input_dim = self.encoder_output_dimensions[1] * self.encoder_output_dimensions[2]
-        self.resnet_enc = LatentPatameterizer(self.resnet_input_dim, FLAGS.latent_dim)
+        self.resnet_enc = LatentParameterizer(self.resnet_input_dim, FLAGS.latent_dim)
         self.latent_dim = FLAGS.latent_dim
 
         self.decoder = ConvDecoderSingle(FLAGS)
         self.resenet_dec = nn.Linear(self.resnet_input_dim + FLAGS.latent_dim, self.resnet_input_dim)
+
+        self.input_dim = FLAGS.input_dim
+        self.device = torch.device(FLAGS.device)
+        pretrained_ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.pretrainedModel + '/')
+        if not self.load_transfer_params(pretrained_ckpt, FLAGS.pretrained_ckpt):
+            raise Exception("AE model needs to be trained")
 
     def reparameterize(self, mu, log_var):
         """
@@ -37,17 +43,22 @@ class ConvMotionTransformVAE(nn.Module):
         sample = mu + (eps * std)
         return sample
 
-    def forward(self, x, p):
+    def forward(self, x):
         """
         Defines forward pass for the ConvMotionTransform VAE
-        :param x : tuple containing (data, targets) of shape ((batch_size, f, 146),(batch, f, 73))
-        :param p : dummy param
-        :output : prediction for seller 2 of shape (batch_size, f, 73)
+        :param x : batch containing dict of subjects
+        :transform x : tuple containing (data, targets) of shape ((batch_size, input_dim*2, f),(batch, input_dim, f))
+        :output : prediction for seller 2 of shape (batch_size, f, input_dim)
         """
-        x, y = x
-        b = x[:, :73, :]
-        s1 = x[:, 73:, :]
+        x, y = self.transform_inputs(x)
+        x = x.to(self.device)
+        y = y.to(self.device)
+        b = x[:, :self.input_dim, :]
+        s1 = x[:, :self.input_dim, :]
         s2 = y
+
+        predictions = {}
+        target = {}
 
         b = self.encoder_b(b)
         s1 = self.encoder_s1(s1)
@@ -80,10 +91,15 @@ class ConvMotionTransformVAE(nn.Module):
             z_star = self.reparameterize(mu_s, log_var_s)
 
         output = self.decoder(eb_star)
+        predictions['pose'] = output
+        target['pose'] = y
         if self.training:
-            return output, mu, log_var, z, z_star
-        else:
-            return output
+            predictions['mu'] = mu
+            predictions['log_var'] = log_var
+            predictions['z'] = z
+            predictions['z_star'] = z_star
+
+        return predictions, target
 
     def save_model(self, path, epoch):
         """
@@ -228,3 +244,22 @@ class ConvMotionTransformVAE(nn.Module):
             return False
 
         return True
+
+    def transform_inputs(self, batch):
+        """
+        Transforms the input dictionary to
+        inputs for the model (batch , sequence_length, input_dim)
+        """
+        b = batch['buyer']['joints21']
+        l = batch['leftSeller']['joints21']
+        r = batch['rightSeller']['joints21']
+        speaking_status = {'buyer': batch['buyer']['speakingStatus'],
+                           'leftSeller': batch['leftSeller']['speakingStatus'],
+                           'rightSeller': batch['rightSeller']['speakingStatus']}
+
+        set_x_a = torch.cat((b, l), dim=2)
+        set_x_b = torch.cat((b, r), dim=2)
+        train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
+        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+
+        return train_x, train_y

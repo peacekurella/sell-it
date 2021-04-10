@@ -17,6 +17,8 @@ class CharControlMotionVAE(nn.Module):
         self.encoder = MVAEencoder(FLAGS)
         self.decoder = MVAEdecoder(FLAGS)
         self.latent_dim = FLAGS.latent_dim
+        self.tf = 0.0
+        self.device = torch.device(FLAGS.device)
         if FLAGS.speak:
             self.speak = nn.Linear(FLAGS.output_dim, 1)
             self.predict_speech = True
@@ -33,7 +35,7 @@ class CharControlMotionVAE(nn.Module):
         sample = mu + (eps * std)
         return sample
 
-    def forward(self, inputs, p):
+    def forward(self, inputs):
         """
         Defines forward pass for the ConvMotionTransform VAE
         :param inputs : dictionary containing inputs of shape (batch_size, F, input_dim*2),
@@ -42,11 +44,13 @@ class CharControlMotionVAE(nn.Module):
         :output : prediction for seller 2 of shape (batch_size, f, 73)
         """
 
+        inputs = self.transform_inputs(inputs)
+
         # unpack into individual sequences
-        x = inputs['trainx']
-        y = inputs['trainy']
-        speakx = inputs['speakx']
-        speaky = inputs['speaky']
+        x = inputs['trainx'].to(self.device)
+        y = inputs['trainy'].to(self.device)
+        speakx = inputs['speakx'].to(self.device)
+        speaky = inputs['speaky'].to(self.device)
 
         # keep track of outputs
         pose_pred = [torch.unsqueeze(y[:, 0, :], dim=1)]
@@ -55,9 +59,10 @@ class CharControlMotionVAE(nn.Module):
         log_vars = []
         output = {}
 
-        # scheduled teacher forcing
+        # scheduled t
+        # eacher forcing
         if self.training:
-            teacher_forcing = True if random.random() < p else False
+            teacher_forcing = True if random.random() < self.tf else False
         else:
             teacher_forcing = False
 
@@ -95,16 +100,16 @@ class CharControlMotionVAE(nn.Module):
             if self.predict_speech:
                 speech_pred.append(self.speak(pose_pred[-1].squeeze(1)).unsqueeze(1))
 
-        output['pose_pred'] = torch.cat(pose_pred, dim=1)
+        output['pose'] = torch.cat(pose_pred, dim=1)
 
         if self.training:
             output['mus'] = torch.cat(mus, dim=1)
             output['log_vars'] = torch.cat(log_vars, dim=1)
 
         if self.predict_speech:
-            output['speech_pred'] = torch.cat(speech_pred, dim=1)
+            output['speech'] = torch.cat(speech_pred, dim=1)
 
-        return output
+        return output, inputs
 
     def save_model(self, path, epoch):
         """
@@ -191,3 +196,38 @@ class CharControlMotionVAE(nn.Module):
         :return: load successful or not in bool
         """
         pass
+
+    def transform_inputs(self, batch):
+        """
+        Transforms the input dictionary to
+        inputs for the model (batch , sequence_length, input_dim)
+        """
+        b = batch['buyer']['joints21']
+        l = batch['leftSeller']['joints21']
+        r = batch['rightSeller']['joints21']
+        speaking_status = {'buyer': batch['buyer']['speakingStatus'],
+                           'leftSeller': batch['leftSeller']['speakingStatus'],
+                           'rightSeller': batch['rightSeller']['speakingStatus']}
+
+        set_x_a = torch.cat((b, l), dim=2)
+        set_x_b = torch.cat((b, r), dim=2)
+        train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
+        train_y = torch.cat((r, l), dim=0).float().cuda()
+        speak_a = torch.cat((speaking_status['buyer'], speaking_status['leftSeller']), dim=2)
+        speak_b = torch.cat((speaking_status['buyer'], speaking_status['rightSeller']), dim=2)
+        speak_x = torch.cat((speak_a, speak_b), dim=0).float().cuda()
+        speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float().cuda()
+        input = {
+            'trainx': train_x,
+            'trainy': train_y,
+            'speakx': speak_x,
+            'speaky': speak_y,
+        }
+        return input
+
+    def set_teacher_forcing(self, p):
+        """
+        Sets the degree of teacher forcing while training
+        :param p: degree of teacher forcing
+        """
+        self.tf = p

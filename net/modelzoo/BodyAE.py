@@ -17,8 +17,10 @@ class BodyAE(nn.Module):
         """
 
         super(BodyAE, self).__init__()
+        print("Training BodyAE")
         self.encoder = ConvEncoderSingle(FLAGS)
         self.decoder = ConvDecoderSingle(FLAGS)
+        self.device = torch.device(FLAGS.device)
 
     def forward(self, x):
         """
@@ -26,11 +28,23 @@ class BodyAE(nn.Module):
         :param x: Input vector of shape (batch_size, f, 73)
         :return: output vector of shape (batch_size, f, 73)
         """
+        # transform the input to the required shape and subjects
+        x, y = self.transform_inputs(x)
+        x = x.to(self.device)
+        y = y.to(self.device)
 
         latent = self.encoder(x)
         out = self.decoder(latent)
 
-        return out
+        prediction = {
+            "pose": out
+        }
+
+        target = {
+            "pose": y
+        }
+
+        return prediction, target
 
     def save_model(self, path, epoch):
         """
@@ -106,3 +120,19 @@ class BodyAE(nn.Module):
         ]
 
         return params
+
+    def transform_inputs(self, batch):
+        """
+        Transforms the input dictionary to
+        inputs for the model (batch , input_dim, sequence_length)
+        """
+        b = batch['buyer']['joints21']
+        l = batch['leftSeller']['joints21']
+        r = batch['rightSeller']['joints21']
+        speaking_status = {'buyer': batch['buyer']['speakingStatus'],
+                           'leftSeller': batch['leftSeller']['speakingStatus'],
+                           'rightSeller': batch['rightSeller']['speakingStatus']}
+
+        train_x = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+        return train_x, train_y

@@ -3,11 +3,15 @@ import torch
 import torch.nn as nn
 import random
 import os
+from scipy import linalg
+from preprocess import export_frechet_animation
 
+from EmbeddingNet import EmbeddingNet
 from preprocess import MannDataFormat, HoldenDataFormat
 from HagglingDataset import HagglingDataset
 from Quaternions import Quaternions
 from DebugVisualizer import DebugVisualizer
+from FrechetEvaluation import FrechetEvaluation
 
 
 class Metrics():
@@ -20,6 +24,7 @@ class Metrics():
 
         self.haggling = HagglingDataset(FLAGS.test, FLAGS)
         self.num_saves = FLAGS.num_saves
+        self.frechet = FrechetEvaluation(FLAGS)
 
         self.output_folder = FLAGS.output_dir
         os.makedirs(self.output_folder, exist_ok=True)
@@ -74,6 +79,27 @@ class Metrics():
 
         return np.average(emd, weights=seq_feature_power)
 
+    def get_frechet_distance(self, predictions, targets):
+        """
+        Calculate the power spectrum similiarity
+        :param predictions:
+        :param targets:
+        :return:
+        """
+        vis = DebugVisualizer()
+
+        prediction_feat, _ = export_frechet_animation(predictions, vis)
+
+        prediction_feat = torch.from_numpy(prediction_feat).float().cuda()
+
+        gt_feat, _ = export_frechet_animation(targets, vis)
+
+        gt_feat = torch.from_numpy(gt_feat).float().cuda()
+
+        frechet_dist = self.frechet.frechet_distance(prediction_feat, gt_feat)
+
+        return frechet_dist
+
     def get_global_positions(self, subjects):
         """
             denormalize and globalize positions of humans
@@ -100,20 +126,21 @@ class Metrics():
     def split_into_subjects(self, predictions, targets, batch):
         # separate right and left seller
         haggling = self.haggling
+        batch_size = int(targets.shape[0] / 2)
 
-        r_target = haggling.denormalize_data(targets['trainy'][0].cpu().numpy())
-        r_prediction = haggling.denormalize_data(predictions[0].cpu().numpy())
-        l_target = haggling.denormalize_data(targets['trainy'][1].cpu().numpy())
-        l_prediction = haggling.denormalize_data(predictions[1].cpu().numpy())
-        buyer = haggling.denormalize_data(batch['buyer']['joints21'].cpu().numpy()[0])
+        r_target = haggling.denormalize_data(targets[0:batch_size].cpu().numpy())
+        r_prediction = haggling.denormalize_data(predictions[0:batch_size].cpu().numpy())
+        l_target = haggling.denormalize_data(targets[batch_size:].cpu().numpy())
+        l_prediction = haggling.denormalize_data(predictions[batch_size:].cpu().numpy())
+        buyer = haggling.denormalize_data(batch['buyer']['joints21'].cpu().numpy())
 
         # get initRot and initTrans
-        initRotRightSeller = Quaternions(batch['rightSeller']['initRot'][0].cpu().numpy())
-        initTransRightSeller = batch['rightSeller']['initTrans'][0].cpu().numpy()
-        initRotLeftSeller = Quaternions(batch['leftSeller']['initRot'][0].cpu().numpy())
-        initTransLeftSeller = batch['leftSeller']['initTrans'][0].cpu().numpy()
-        initRotBuyer = Quaternions(batch['buyer']['initRot'][0].cpu().numpy())
-        initTransBuyer = batch['buyer']['initTrans'][0].cpu().numpy()
+        initRotRightSeller = Quaternions(batch['rightSeller']['initRot'].cpu().numpy())
+        initTransRightSeller = batch['rightSeller']['initTrans'].cpu().numpy()
+        initRotLeftSeller = Quaternions(batch['leftSeller']['initRot'].cpu().numpy())
+        initTransLeftSeller = batch['leftSeller']['initTrans'].cpu().numpy()
+        initRotBuyer = Quaternions(batch['buyer']['initRot'].cpu().numpy())
+        initTransBuyer = batch['buyer']['initTrans'].cpu().numpy()
 
         prediction_subjects = [
             (r_prediction.copy(), initRotRightSeller, initTransRightSeller),
@@ -148,25 +175,25 @@ class Metrics():
         vis.create_animation(skel, file_location + '/' + role)
 
     def compute_and_save(self, predictions, targets, batch, i_batch, test_num):
-        predictions, targets = self.split_into_subjects(predictions['pose_pred'], targets, batch)
+        predictions, targets = self.split_into_subjects(predictions['pose'], targets['pose'], batch)
 
         predictions = self.get_global_positions(predictions)
         targets = self.get_global_positions(targets)
 
-        metrics = [
-            [
-                Metrics.get_mse_loss(predictions[0], targets[0]),
-                Metrics.get_mse_loss(predictions[1], targets[1])
-            ],
-            [
-                Metrics.get_npss_score(predictions[0], targets[0]),
-                Metrics.get_npss_score(predictions[1], targets[1])
-            ]
-        ]
+        metrics = {
+            "mse_right_seller" : Metrics.get_mse_loss(predictions[0], targets[0]).cpu().numpy().item(),
+            "mse_left_seller"  : Metrics.get_mse_loss(predictions[1], targets[1]).cpu().numpy().item(),
 
-        if 0.4 < random.random() < 0.5 and self.num_saves > 0:
-            self.save_files(predictions[0], targets, 'right', i_batch, test_num)
-            self.save_files(predictions[1], targets, 'left', i_batch, test_num)
-            self.num_saves -= 1
+            "npss_right_seller" : Metrics.get_npss_score(predictions[0], targets[0]),
+            "npss_left_seller" : Metrics.get_npss_score(predictions[1], targets[1]),
+
+            "frechet_right_seller" : Metrics.get_frechet_distance(self, predictions[0], targets[0]),
+            "frechet_left_seller" : Metrics.get_frechet_distance(self, predictions[1], targets[1])
+        }
+
+        # if 0.4 < random.random() < 0.5 and self.num_saves > 0:
+        #     self.save_files(predictions[0], targets, 'right', i_batch, test_num)
+        #     self.save_files(predictions[1], targets, 'left', i_batch, test_num)
+        #     self.num_saves -= 1
 
         return metrics

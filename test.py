@@ -41,10 +41,11 @@ flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
 flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
-flags.DEFINE_integer('c_dim', 1, 'number of conditional variables added to latent dimension')
+flags.DEFINE_integer('c_dim', 2, 'number of conditional variables added to latent dimension')
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
-
+flags.DEFINE_integer('frechet_pose_dim', 42, 'Number of joint directions')
+flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model weights')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'input pose vector dimension')
@@ -127,7 +128,6 @@ def get_model():
 
 
 def main(arg):
-
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, num_workers=10)
 
@@ -163,6 +163,7 @@ def main(arg):
 
                 out = metrics.compute_and_save(predictions, inputs, batch, i_batch, test_num)
                 print(out)
+
 
 if __name__ == "__main__":
     app.run(main)

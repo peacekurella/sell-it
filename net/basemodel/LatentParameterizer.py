@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 
 
-class LatentPatameterizer(nn.Module):
+class LatentParameterizer(nn.Module):
 
     def __init__(self, input_dimensions, latent_dimension):
         """define a resnet dense layer"""
-        super(LatentPatameterizer, self).__init__()
+        super(LatentParameterizer, self).__init__()
         self.mean = nn.Linear(input_dimensions, latent_dimension)
         self.std = nn.Linear(input_dimensions, latent_dimension)
 
