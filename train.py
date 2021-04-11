@@ -1,5 +1,7 @@
 import sys
 import wandb
+import glob
+import onnx
 
 from Metrics import Metrics
 from net.modelzoo.BodyAE import BodyAE
@@ -33,7 +35,7 @@ flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model 
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 400, 'Training epochs')
+flags.DEFINE_integer('epochs', 1, 'Training epochs')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
@@ -158,11 +160,12 @@ def main(args):
 
     # set the wandb config
     config = FLAGS.flag_values_dict()
-    run = wandb.init(project="sell-it", reinit=True, config=config)
+    run = wandb.init(project="SellIt", config=config)
 
-    # initialize the model
+    # initialize the model, log it for visualization
     model = get_model()
-
+    torch.onnx.export(model, next(iter(train_dataloader)), os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+    wandb.save(os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
 
     starting_epoch = 0
 
