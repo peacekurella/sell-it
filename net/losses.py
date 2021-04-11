@@ -24,25 +24,13 @@ def reconstruction_l1(predictions, targets, model_params, FLAGS):
         l1_loss += torch.norm(param, 1)
 
     loss = {
-        "total_loss": mse + (lmd * l1_loss),
-        "loss_mse": mse,
-        "loss_regularization": lmd * l1_loss
+        "Total_Loss": mse + (lmd * l1_loss),
+        "Reconstruction_Loss": mse,
+        "Regularization_Loss": lmd * l1_loss,
+        "CrossEntropy_Loss": torch.zeros(1)
     }
 
     return loss
-
-
-def meanJointPoseError(predictions, targets):
-    """
-    Defines an MSE loss
-    :param predictions: predictions from the model
-    :param targets: ground truths
-    :return: average loss for the predicition
-    """
-    pose_pred = predictions['pose']
-    pose_gt = targets['pose']
-    loss = nn.MSELoss(reduction='mean')
-    return loss(pose_pred, pose_gt)
 
 
 def reconstruction_VAE(predictions, targets, model_params, FLAGS):
@@ -67,7 +55,7 @@ def reconstruction_VAE(predictions, targets, model_params, FLAGS):
     criterion1 = nn.MSELoss(reduction='mean')
 
     # calculate the reconstruction loss
-    loss_mse = criterion1(prediction, target)
+    Reconstruction_Loss = criterion1(prediction, target)
 
     # calculate the KL Divergence loss
     loss_kld = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
@@ -76,9 +64,10 @@ def reconstruction_VAE(predictions, targets, model_params, FLAGS):
     loss_cycle = criterion1(z, z_star)
 
     loss = {
-        "total_loss": loss_mse + lmd * loss_kld + 0.1 * loss_cycle,
-        "loss_mse": loss_mse,
-        "loss_regularization": loss_kld
+        "Total_Loss": Reconstruction_Loss + lmd * loss_kld + 0.1 * loss_cycle,
+        "Reconstruction_Loss": Reconstruction_Loss,
+        "Regularization_Loss": loss_kld,
+        "CrossEntropy_Loss": torch.zeros(1)
     }
 
     return loss
@@ -107,25 +96,25 @@ def sequential_reconstruction_VAE(predictions, target, model_params, FLAGS):
 
     lmd2 = FLAGS.lmd2
 
-    loss_speech = torch.zeros(1).cuda()
+    CrossEntropy_Loss = torch.zeros(1).cuda()
     # set the criterion objects for mse
     criterion1 = nn.SmoothL1Loss(reduction='mean')
 
     # calculate the reconstruction loss
-    loss_mse = criterion1(pose_pred, target['trainy'][:, :pose_pred.shape[1]])
+    Reconstruction_Loss = criterion1(pose_pred, target['trainy'][:, :pose_pred.shape[1]])
 
     # calculate the KL Divergence loss
     loss_kld = torch.mean(torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
 
     if FLAGS.speak:
         criterion2 = nn.BCEWithLogitsLoss(reduction='mean')
-        loss_speech = criterion2(speech_pred, target['speaky'][:, :pose_pred.shape[1]])
+        CrossEntropy_Loss = criterion2(speech_pred, target['speaky'][:, :pose_pred.shape[1]])
 
     losses = {
-        'total_loss': loss_mse + (lmd * loss_kld) + (lmd2 * loss_speech),
-        'loss_regularization': loss_kld,
-        'loss_speech': loss_speech,
-        'loss_mse': loss_mse,
+        'Total_Loss': Reconstruction_Loss + (lmd * loss_kld) + (lmd2 * CrossEntropy_Loss),
+        'Regularization_Loss': loss_kld,
+        'CrossEntropy_Loss': CrossEntropy_Loss,
+        'Reconstruction_Loss': Reconstruction_Loss,
     }
 
     return losses

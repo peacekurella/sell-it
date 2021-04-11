@@ -1,4 +1,5 @@
 import sys
+import wandb
 
 from Metrics import Metrics
 from net.modelzoo.BodyAE import BodyAE
@@ -28,7 +29,7 @@ flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
-flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model weights')
+flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
@@ -59,7 +60,7 @@ flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "MTVAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
@@ -144,46 +145,6 @@ def decay_p(p, epoch, model):
     return
 
 
-# def get_hyperparameters():
-#     if FLAGS.model == "bodyAE":
-#         hyperparameter_defaults = dict(
-#             batch_size=FLAGS.batch_size,
-#             learning_rate=FLAGS.learning_rate,
-#             epochs=FLAGS.epochs,
-#             lmd=FLAGS.lmd,
-#             optimizer=FLAGS.optimizer
-#         )
-#     elif FLAGS.model == "MVAE":
-#         hyperparameter_defaults = dict(
-#             batch_size=FLAGS.batch_size,
-#             learning_rate=FLAGS.learning_rate,
-#             epochs=FLAGS.epochs,
-#             lmd=FLAGS.lmd,
-#             optimizer=FLAGS.optimizer,
-#             latent_dim=FLAGS.latent_dim,
-#             enc_hidden_units=FLAGS.enc_hidden_units,
-#             dec_hidden_units=FLAGS.dec_hidden_units,
-#             enc_layers=FLAGS.enc_layers,
-#             enc_dropout=FLAGS.enc_dropout,
-#             dec_dropout=FLAGS.dec_dropout
-#         )
-#     else:
-#         hyperparameter_defaults = dict(
-#             batch_size=FLAGS.batch_size,
-#             learning_rate=FLAGS.learning_rate,
-#             epochs=FLAGS.epochs,
-#             lmd=FLAGS.lmd,
-#             optimizer=FLAGS.optimizer,
-#             enc_hidden_units=FLAGS.enc_hidden_units,
-#             dec_hidden_units=FLAGS.dec_hidden_units,
-#             enc_layers=FLAGS.enc_layers,
-#             dec_layers=FLAGS.dec_layers,
-#             dropout=FLAGS.dropout,
-#             tf_ratio=FLAGS.tf_ratio
-#         )
-#     return hyperparameter_defaults
-
-
 def main(args):
     # make sure dec hidden units and layers are same
     FLAGS.dec_hidden_units = FLAGS.enc_hidden_units
@@ -195,13 +156,13 @@ def main(args):
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
-    # get default_hyperparameters
-    # hyperparameter_defaults = get_hyperparameters()
+    # set the wandb config
+    config = FLAGS.flag_values_dict()
+    run = wandb.init(project="sell-it", reinit=True, config=config)
 
     # initialize the model
     model = get_model()
-    print("model acquired")
-    # run = wandb.init(project=FLAGS.model, config=hyperparameter_defaults)
+
 
     starting_epoch = 0
 
@@ -213,107 +174,111 @@ def main(args):
     # get the loss function and optimizers
     criterion = get_loss_fn()
     optimizer = get_optimizer(model.get_trainable_parameters())
-    print("Optimizer ready to optimize")
     p = 1.0
 
     metrics = Metrics(FLAGS)
 
-    # start watching the model for gradient info
-    # wandb.watch(model)
-
     # run the training script
     for epoch in range(starting_epoch + 1, FLAGS.epochs + 1):
 
-        # check
-        print("epoch started")
-
         # initialize the total epoch loss values
-        epoch_train_loss = 0.0
-        epoch_train_rec_loss = 0.0
-        epoch_train_reg_loss = 0.0
-        epoch_val_loss = 0.0
-        epoch_speech_loss = 0.0
+        train_loss_logs = {
+            'Train/Total_Loss': 0,
+            'Train/Reconstruction_Loss': 0,
+            'Train/Regularization_Loss': 0,
+            'Train/CrossEntropy_Loss': 0
+        }
+
+        train_metric_logs = {
+            'Train/RightMSE': 0,
+            'Train/LeftMSE': 0,
+            'Train/RightNPSS': 0,
+            'Train/LeftNPSS': 0,
+            'Train/RightFrechet': 0,
+            'Train/LeftFrechet': 0
+        }
+
+        test_metric_logs = {
+            'Test/RightMSE': 0,
+            'Test/LeftMSE': 0,
+            'Test/RightNPSS': 0,
+            'Test/LeftNPSS': 0,
+            'Test/RightFrechet': 0,
+            'Test/LeftFrechet': 0
+        }
 
         # set model to train mode
         model.train()
 
-        #  calculate training loss, update params
-        count_train = 0
-
+        # decay factor set
         decay_p(p, epoch, model)
 
-        # decay factor set
-        print("decay factor is set")
+        # run through all the batches
         for i_batch, batch in enumerate(train_dataloader):
+
             # zero prev gradients
             optimizer.zero_grad()
 
+            # forward pass through the net
             predictions, targets = model(batch)
 
             # calculate loss
             losses = criterion(predictions, targets, model.parameters(), FLAGS)
-            print(losses)
-
-            total_loss = losses['total_loss']
-            rec_loss = losses['loss_mse']
-            reg_loss = losses['loss_regularization']
-            if 'loss_speech' in losses:
-                speech_loss = losses['loss_speech']
-            else:
-                speech_loss = torch.tensor(0.0)
-
-            epoch_train_loss += total_loss.detach().item()
-            epoch_train_rec_loss += rec_loss.detach().item()
-            epoch_train_reg_loss += reg_loss.detach().item()
-            epoch_speech_loss += speech_loss.detach().item()
-            count_train += 1
+            total_loss = losses['Total_Loss']
 
             # calculate gradients
             total_loss.backward()
             optimizer.step()
+
+            # compute train metrics
+            with torch.no_grad():
+                train_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
+                train_metric_logs = {
+                    'Train/'+key: train_metrics[key] + train_metric_logs['Train/'+key] for key in train_metrics
+                }
+                train_loss_logs = {
+                    'Train/' + key: losses[key].detach().cpu().numpy().item() + train_loss_logs['Train/' + key] for key in losses
+                }
 
         # set the model to evaluation mode
         model.eval()
 
         # calculate validation loss
         with torch.no_grad():
-            count_test = 0
             for i_batch, batch in enumerate(test_dataloader):
+
+                # forward pass through the net
                 predictions, targets = model(batch)
 
-                val_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, 0)
-                print(val_metrics)
+                # consolidate metrics
+                test_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
+                test_metric_logs = {
+                    'Test/'+key: test_metrics[key] + test_metric_logs['Test/'+key] for key in test_metrics
+                }
 
-                # calculate loss
-                # val_loss = meanJointPoseError(predictions, targets)
-                # epoch_val_loss += val_loss.detach().item()
-                # del val_loss
-                count_test += 1
-
-        # log the metrics
-        losses = {
-            'train_total_loss': epoch_train_loss / count_train,
-            'train_rec_loss': epoch_train_rec_loss / count_train,
-            'train_reg_loss': epoch_train_reg_loss / count_train,
-            'train_speech_loss': epoch_speech_loss / count_train,
-            'val_loss': epoch_val_loss / count_test
+        # scale the metrics
+        train_metric_logs = {
+            key: train_metric_logs[key] / len(train_dataloader) for key in train_metric_logs
+        }
+        train_loss_logs = {
+            key: train_loss_logs[key] / len(train_dataloader) for key in train_loss_logs
+        }
+        test_metric_logs = {
+            key: test_metric_logs[key] / len(test_dataloader) for key in test_metric_logs
         }
 
-        print(losses)
-
-        # wandb.log({
-        #     'train_total_loss': epoch_train_loss / count_train,
-        #     'train_rec_loss': epoch_train_rec_loss / count_train,
-        #     'train_reg_loss': epoch_train_reg_loss / count_train,
-        #     'train_speech_loss': epoch_speech_loss / count_train,
-        #     'val_loss': epoch_val_loss / count_test
-        # })
+        # log all the metrics
+        run.log({
+            ** train_metric_logs,
+            ** train_loss_logs,
+            ** test_metric_logs
+        })
 
         if epoch % FLAGS.ckpt == 0 and epoch > 0:
             ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
             model.save_model(ckpt, epoch)
 
-    # run.finish()
+    run.finish()
 
 
 if __name__ == '__main__':
