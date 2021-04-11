@@ -91,8 +91,8 @@ class ConvMotionTransformVAE(nn.Module):
             z_star = self.reparameterize(mu_s, log_var_s)
 
         output = self.decoder(eb_star)
-        predictions['pose'] = output
-        target['pose'] = y
+        predictions['pose'] = output.permute(0, 2, 1)
+        target['pose'] = y.permute(0, 2, 1)
         if self.training:
             predictions['mu'] = mu
             predictions['log_var'] = log_var

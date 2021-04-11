@@ -17,7 +17,6 @@ class BodyAE(nn.Module):
         """
 
         super(BodyAE, self).__init__()
-        print("Training BodyAE")
         self.encoder = ConvEncoderSingle(FLAGS)
         self.decoder = ConvDecoderSingle(FLAGS)
         self.device = torch.device(FLAGS.device)
@@ -37,11 +36,11 @@ class BodyAE(nn.Module):
         out = self.decoder(latent)
 
         prediction = {
-            "pose": out
+            "pose": out.permute(0, 2, 1)
         }
 
         target = {
-            "pose": y
+            "pose": y.permute(0, 2, 1)
         }
 
         return prediction, target
@@ -98,6 +97,8 @@ class BodyAE(nn.Module):
 
         # try to load the models
         # noinspection PyBroadException
+        print(enc_path)
+        print(dec_path)
         try:
             self.encoder.load_state_dict(torch.load(enc_path))
             self.decoder.load_state_dict(torch.load(dec_path))

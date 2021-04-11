@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import random
 import os
-from scipy import linalg
+from sklearn.metrics import accuracy_score
 from preprocess import export_frechet_animation
 
 from EmbeddingNet import EmbeddingNet
@@ -26,7 +26,9 @@ class Metrics():
         self.num_saves = FLAGS.num_saves
         self.frechet = FrechetEvaluation(FLAGS)
 
-        self.output_folder = FLAGS.output_dir
+        self.skeleton = DebugVisualizer().humanSkeleton
+
+        self.output_folder = FLAGS.output_dir + FLAGS.model + '/'
         os.makedirs(self.output_folder, exist_ok=True)
 
     @staticmethod
@@ -81,24 +83,38 @@ class Metrics():
 
     def get_frechet_distance(self, predictions, targets):
         """
-        Calculate the power spectrum similiarity
+        Calculate the frechet distance
         :param predictions:
         :param targets:
         :return:
         """
-        vis = DebugVisualizer()
 
-        prediction_feat, _ = export_frechet_animation(predictions, vis)
+        prediction_feat, _ = export_frechet_animation(predictions, self.skeleton)
 
         prediction_feat = torch.from_numpy(prediction_feat).float().cuda()
 
-        gt_feat, _ = export_frechet_animation(targets, vis)
+        gt_feat, _ = export_frechet_animation(targets, self.skeleton)
 
         gt_feat = torch.from_numpy(gt_feat).float().cuda()
 
         frechet_dist = self.frechet.frechet_distance(prediction_feat, gt_feat)
 
         return frechet_dist
+
+    def get_speech_accuracy(self, predictions, targets):
+        """
+        Calculate speech accuracy
+        :param predictions: batch_size, seq_length, 1
+        :param targets: batch_size, seq_legnth, 1
+        :return : accuracy
+        """
+        predictions = (predictions > 0.5).astype(int).flatten()
+
+        targets = targets.flatten()
+
+        acc = accuracy_score(predictions, targets)
+
+        return acc
 
     def get_global_positions(self, subjects):
         """
@@ -145,7 +161,7 @@ class Metrics():
         prediction_subjects = [
             (r_prediction.copy(), initRotRightSeller, initTransRightSeller),
             (l_prediction.copy(), initRotLeftSeller, initTransLeftSeller),
-            (buyer.copy(), initRotBuyer, initTransBuyer)
+            (buyer.copy(), initRotBuyer, initTransBuyer),
         ]
 
         target_subjects = [
@@ -154,9 +170,15 @@ class Metrics():
             (buyer.copy(), initRotBuyer, initTransBuyer)
         ]
 
+        # if 'speech' in predictions:
+        #     prediction_subjects.append(
+        #         (predictions['speech'][:batch_size].cpu().numpy(), predictions['speech'][batch_size:].cpu().numpy()))
+        #     target_subjects.append((batch['rightSeller']['speakingStatus'].cpu().numpy(),
+        #                             batch['leftSeller']['speakingStatus'].cpu().numpy()))
+
         return prediction_subjects, target_subjects
 
-    def save_files(self, prediction, targets, role, i_batch, test_num):
+    def save_files(self, prediction, targets, role, i_batch, test_num, idx):
         # prepare skeletons to write in the video
         skel = []
 
@@ -164,15 +186,16 @@ class Metrics():
 
         # create skeletons
         for target in targets:
-            x = vis.conv_debug_visual_form(target)
+            x = vis.conv_debug_visual_form(target[idx])
             skel.append(x)
 
-        x = vis.conv_debug_visual_form(prediction)
+        x = vis.conv_debug_visual_form(prediction[idx])
         skel.append(x)
 
-        file_location = self.output_folder + str(i_batch) + '_' + str(test_num)
+        file_location = self.output_folder + str(test_num) + '_' + str(i_batch) + '_' + str(idx)
         os.makedirs(file_location, exist_ok=True)
         vis.create_animation(skel, file_location + '/' + role)
+        del vis
 
     def compute_and_save(self, predictions, targets, batch, i_batch, test_num):
         predictions, targets = self.split_into_subjects(predictions['pose'], targets['pose'], batch)
@@ -181,19 +204,23 @@ class Metrics():
         targets = self.get_global_positions(targets)
 
         metrics = {
-            "mse_right_seller" : Metrics.get_mse_loss(predictions[0], targets[0]).cpu().numpy().item(),
-            "mse_left_seller"  : Metrics.get_mse_loss(predictions[1], targets[1]).cpu().numpy().item(),
+            "mse_right_seller": Metrics.get_mse_loss(predictions[0], targets[0]).cpu().numpy().item(),
+            "mse_left_seller": Metrics.get_mse_loss(predictions[1], targets[1]).cpu().numpy().item(),
 
-            "npss_right_seller" : Metrics.get_npss_score(predictions[0], targets[0]),
-            "npss_left_seller" : Metrics.get_npss_score(predictions[1], targets[1]),
+            "npss_right_seller": Metrics.get_npss_score(predictions[0], targets[0]),
+            "npss_left_seller": Metrics.get_npss_score(predictions[1], targets[1]),
 
-            "frechet_right_seller" : Metrics.get_frechet_distance(self, predictions[0], targets[0]),
-            "frechet_left_seller" : Metrics.get_frechet_distance(self, predictions[1], targets[1])
+            "frechet_right_seller": Metrics.get_frechet_distance(self, predictions[0], targets[0]),
+            "frechet_left_seller": Metrics.get_frechet_distance(self, predictions[1], targets[1])
         }
+        if len(predictions) == 4:
+            metrics['right_speech_accuracy'] = self.get_speech_accuracy(predictions[3][0], targets[3][0])
+            metrics['left_speech_accuracy'] = self.get_speech_accuracy(predictions[3][1], targets[3][1])
 
-        # if 0.4 < random.random() < 0.5 and self.num_saves > 0:
-        #     self.save_files(predictions[0], targets, 'right', i_batch, test_num)
-        #     self.save_files(predictions[1], targets, 'left', i_batch, test_num)
-        #     self.num_saves -= 1
+        idxs = random.sample(range(predictions[0].shape[0]), self.num_saves)
+
+        for i in idxs:
+            self.save_files(predictions[0], targets, 'right', i_batch, test_num, i)
+            self.save_files(predictions[1], targets, 'left', i_batch, test_num, i)
 
         return metrics

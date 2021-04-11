@@ -851,8 +851,7 @@ def export_mann_data(input_directory, output_directory, window_length, stride):
         pickle.dump(stds, handle)
 
 
-def export_frechet_animation(positions, vis):
-    humanSkeleton = vis.humanSkeleton
+def export_frechet_animation(positions, humanSkeleton):
 
     directions = np.zeros((positions.shape[0], positions.shape[1], len(humanSkeleton), 3))
 

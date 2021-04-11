@@ -9,6 +9,7 @@ import torch
 from absl import app
 from absl import flags
 from torch.utils.data import DataLoader
+import pandas as pd
 
 from BodyAE import BodyAE
 from BodyMotionGenerator import BodyMotionGenerator
@@ -20,10 +21,11 @@ from Metrics import Metrics
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing test files')
-flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', 'ckpt/MVAE/ME', 'file containing the model weights')
+flags.DEFINE_string('output_dir', 'Data/output/', 'Folder to store final videos')
+flags.DEFINE_string('ckpt', 'ckpt/', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.2, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder LSTM hidden units')
@@ -49,64 +51,18 @@ flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model 
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'input pose vector dimension')
-flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
 flags.DEFINE_bool('pretrain', False, 'Use a pretrained model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
-flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
-flags.DEFINE_integer('num_saves', 20, 'number of outputs to save')
-flags.DEFINE_integer('test_ckpt', None, 'checkpoint to test')
+flags.DEFINE_integer('batch_runs', 1, 'Number of times give the same input to VAE')
+flags.DEFINE_integer('num_saves', 0, 'number of outputs to save')
+flags.DEFINE_integer('test_ckpt', 50, 'checkpoint to test')
 flags.DEFINE_string('fmt', 'mann', 'data format')
+flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
 
 pss = lambda a, b: a == b
-
-
-def get_input(batch):
-    """
-    Generates the inputs to the network
-    :param batch: batch for training
-    :return: train_x, train_y tensors
-    """
-    b = batch['buyer']['joints21']
-    l = batch['leftSeller']['joints21']
-    r = batch['rightSeller']['joints21']
-    speaking_status = {'buyer': batch['buyer']['speakingStatus'],
-                       'leftSeller': batch['leftSeller']['speakingStatus'],
-                       'rightSeller': batch['rightSeller']['speakingStatus']}
-
-    if FLAGS.pretrain:
-        if FLAGS.CNN:
-            train_x = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
-            train_y = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
-            return train_x, train_y
-        else:
-            train_x = torch.cat((l, r), dim=0).float().cuda()
-            train_y = torch.cat((l, r), dim=0).float().cuda()
-            return train_x, train_y
-    else:
-        if FLAGS.CNN:
-            set_x_a = torch.cat((b, l), dim=2)
-            set_x_b = torch.cat((b, r), dim=2)
-            train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
-            train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-            return train_x, train_y
-        else:
-            set_x_a = torch.cat((b, l), dim=2)
-            set_x_b = torch.cat((b, r), dim=2)
-            train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
-            train_y = torch.cat((r, l), dim=0).float().cuda()
-            speak_a = torch.cat((speaking_status['buyer'], speaking_status['leftSeller']), dim=2)
-            speak_b = torch.cat((speaking_status['buyer'], speaking_status['rightSeller']), dim=2)
-            speak_x = torch.cat((speak_a, speak_b), dim=0).float().cuda()
-            speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float().cuda()
-            input = {
-                'trainx': train_x,
-                'trainy': train_y,
-                'speakx': speak_x,
-                'speaky': speak_y,
-            }
-            return input
 
 
 def get_model():
@@ -114,30 +70,32 @@ def get_model():
     Returns the appropriate model for training
     :return: PyTorch model that extends nn.Module
     """
-
     if FLAGS.model == 'bodyAE':
-        return BodyAE(FLAGS).cuda()
-    if FLAGS.model == 'LstmAE':
-        return LstmBodyAE(FLAGS).cuda()
-    if FLAGS.model == 'MTVAE':
-        return ConvMotionTransformVAE(FLAGS).cuda()
-    if FLAGS.model == 'MVAE':
-        return CharControlMotionVAE(FLAGS).cuda()
+        x = BodyAE(FLAGS).to(torch.device(FLAGS.device))
+        return x
+    elif FLAGS.model == 'lstmAE':
+        return LstmBodyAE(FLAGS).to(torch.device(FLAGS.device))
+    elif FLAGS.model == 'MTVAE':
+        return ConvMotionTransformVAE(FLAGS).to(torch.device(FLAGS.device))
+    elif FLAGS.model == 'MVAE':
+        return CharControlMotionVAE(FLAGS).to(torch.device(FLAGS.device))
     else:
-        return BodyMotionGenerator(FLAGS).cuda()
+        return BodyMotionGenerator(FLAGS).to(torch.device(FLAGS.device))
 
 
 def main(arg):
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
-    test_dataloader = DataLoader(test_dataset, num_workers=10)
+    test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, num_workers=10)
 
-    ckpt = FLAGS.ckpt
+    ckpt = FLAGS.ckpt + FLAGS.model
 
     model = get_model()
     model.load_model(ckpt, FLAGS.test_ckpt)
     model.eval()
 
     metrics = Metrics(FLAGS)
+
+    df = pd.DataFrame()
 
     with torch.no_grad():
         for i_batch, batch in enumerate(test_dataloader):
@@ -147,22 +105,20 @@ def main(arg):
                 batch_runs = FLAGS.batch_runs
 
             for test_num in range(0, batch_runs):
+                predictions, targets = model(batch)
 
-                # get test input and labels
-                inputs = get_input(batch)
+                out = metrics.compute_and_save(predictions, targets, batch, i_batch, test_num)
 
-                # forward pass through the network
-                if FLAGS.VAE:
-                    predictions = model(inputs, 0.0)
-                else:
-                    predictions = model(inputs)
-
-                # if FLAGS.CNN:
-                #     targets = targets.permute(0, 2, 1)
-                #     predictions = predictions.permute(0, 2, 1)
-
-                out = metrics.compute_and_save(predictions, inputs, batch, i_batch, test_num)
                 print(out)
+
+                df = df.append(out, ignore_index=True)
+
+        df_mean = df.mean(axis=0)
+        df_std = df.std(axis=0)
+        print(df_mean)
+        print(df_std)
+        df_mean.to_csv('testResults/'+FLAGS.model+'/mean.csv')
+        df_std.to_csv('testResults/' + FLAGS.model + '/std.csv')
 
 
 if __name__ == "__main__":
