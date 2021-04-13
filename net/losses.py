@@ -101,14 +101,14 @@ def sequential_reconstruction_VAE(predictions, target, model_params, FLAGS):
     criterion1 = nn.SmoothL1Loss(reduction='mean')
 
     # calculate the reconstruction loss
-    Reconstruction_Loss = criterion1(pose_pred, target['trainy'][:, :pose_pred.shape[1]])
+    Reconstruction_Loss = criterion1(pose_pred, target['pose'][:, :pose_pred.shape[1]])
 
     # calculate the KL Divergence loss
     loss_kld = torch.mean(torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
 
     if FLAGS.speak:
         criterion2 = nn.BCEWithLogitsLoss(reduction='mean')
-        CrossEntropy_Loss = criterion2(speech_pred, target['speaky'][:, :pose_pred.shape[1]])
+        CrossEntropy_Loss = criterion2(speech_pred, target['speech'][:, :pose_pred.shape[1]])
 
     losses = {
         'Total_Loss': Reconstruction_Loss + (lmd * loss_kld) + (lmd2 * CrossEntropy_Loss),

@@ -1,6 +1,7 @@
 import os
-import torch.nn as nn
 import torch
+import torch.nn as nn
+import torch.onnx
 import glob
 
 from ConvEncoderSingle import ConvEncoderSingle
@@ -27,6 +28,10 @@ class BodyAE(nn.Module):
         :param x: Input vector of shape (batch_size, f, 73)
         :return: output vector of shape (batch_size, f, 73)
         """
+
+        # store for exporting
+        self.dummy_input = x
+
         # transform the input to the required shape and subjects
         x, y = self.transform_inputs(x)
         x = x.to(self.device)
@@ -127,12 +132,9 @@ class BodyAE(nn.Module):
         Transforms the input dictionary to
         inputs for the model (batch , input_dim, sequence_length)
         """
-        b = batch['buyer']['joints21']
+
         l = batch['leftSeller']['joints21']
         r = batch['rightSeller']['joints21']
-        speaking_status = {'buyer': batch['buyer']['speakingStatus'],
-                           'leftSeller': batch['leftSeller']['speakingStatus'],
-                           'rightSeller': batch['rightSeller']['speakingStatus']}
 
         train_x = torch.cat((r, l), dim=0).permute(0, 2, 1).float()
         train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float()

@@ -7,6 +7,7 @@ import torch.nn as nn
 from MVAEencoder import MVAEencoder
 from MVAEdecoder import MVAEdecoder
 
+
 class CharControlMotionVAE(nn.Module):
 
     def __init__(self, FLAGS):
@@ -31,7 +32,7 @@ class CharControlMotionVAE(nn.Module):
         :param log_var: log variance from encoder's latent space
         """
         std = torch.exp(0.5 * log_var)
-        eps = torch.randn_like(std).cuda()
+        eps = torch.randn_like(std)
         sample = mu + (eps * std)
         return sample
 
@@ -58,6 +59,10 @@ class CharControlMotionVAE(nn.Module):
         mus = []
         log_vars = []
         output = {}
+        inputs = {
+            'pose': y,
+            'speech': speaky
+        }
 
         # scheduled t
         # eacher forcing
@@ -83,7 +88,7 @@ class CharControlMotionVAE(nn.Module):
                 z = self.reparameterize(mu, log_var)
 
             else:
-                z = torch.randn((x.shape[0], self.latent_dim)).cuda()
+                z = torch.randn((x.shape[0], self.latent_dim)).to(self.device)
 
             # adding conditions to the latent dimension
             # z = torch.cat((z, speakx[:, t, 1].unsqueeze(1)), dim=-1)
@@ -205,9 +210,13 @@ class CharControlMotionVAE(nn.Module):
         b = batch['buyer']['joints21']
         l = batch['leftSeller']['joints21']
         r = batch['rightSeller']['joints21']
-        speaking_status = {'buyer': batch['buyer']['speakingStatus'],
-                           'leftSeller': batch['leftSeller']['speakingStatus'],
-                           'rightSeller': batch['rightSeller']['speakingStatus']}
+
+        # get the speaking status
+        speaking_status = {
+            'buyer': batch['buyer']['speakingStatus'],
+            'leftSeller': batch['leftSeller']['speakingStatus'],
+            'rightSeller': batch['rightSeller']['speakingStatus']
+        }
 
         set_x_a = torch.cat((b, l), dim=2)
         set_x_b = torch.cat((b, r), dim=2)

@@ -34,7 +34,7 @@ flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
+flags.DEFINE_integer('batch_size', 1, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 1, 'Training epochs')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
@@ -62,7 +62,7 @@ flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
@@ -164,8 +164,11 @@ def main(args):
 
     # initialize the model, log it for visualization
     model = get_model()
-    torch.onnx.export(model, next(iter(train_dataloader)), os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
-    wandb.save(os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+    try:
+        torch.onnx.export(model, next(iter(train_dataloader)), os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+        wandb.save(os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+    except Exception as e:
+        print(e)
 
     starting_epoch = 0
 
