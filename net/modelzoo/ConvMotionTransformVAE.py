@@ -259,7 +259,7 @@ class ConvMotionTransformVAE(nn.Module):
 
         set_x_a = torch.cat((b, l), dim=2)
         set_x_b = torch.cat((b, r), dim=2)
-        train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+        train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float()
+        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float()
 
         return train_x, train_y

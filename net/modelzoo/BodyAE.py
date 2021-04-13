@@ -134,6 +134,6 @@ class BodyAE(nn.Module):
                            'leftSeller': batch['leftSeller']['speakingStatus'],
                            'rightSeller': batch['rightSeller']['speakingStatus']}
 
-        train_x = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
+        train_x = torch.cat((r, l), dim=0).permute(0, 2, 1).float()
+        train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float()
         return train_x, train_y

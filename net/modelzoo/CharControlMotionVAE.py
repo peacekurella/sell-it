@@ -211,12 +211,12 @@ class CharControlMotionVAE(nn.Module):
 
         set_x_a = torch.cat((b, l), dim=2)
         set_x_b = torch.cat((b, r), dim=2)
-        train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
-        train_y = torch.cat((r, l), dim=0).float().cuda()
+        train_x = torch.cat((set_x_a, set_x_b), dim=0).float()
+        train_y = torch.cat((r, l), dim=0).float()
         speak_a = torch.cat((speaking_status['buyer'], speaking_status['leftSeller']), dim=2)
         speak_b = torch.cat((speaking_status['buyer'], speaking_status['rightSeller']), dim=2)
-        speak_x = torch.cat((speak_a, speak_b), dim=0).float().cuda()
-        speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float().cuda()
+        speak_x = torch.cat((speak_a, speak_b), dim=0).float()
+        speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float()
         input = {
             'trainx': train_x,
             'trainy': train_y,

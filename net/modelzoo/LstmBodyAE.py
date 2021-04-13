@@ -172,6 +172,6 @@ class LstmBodyAE(nn.Module):
                            'leftSeller': batch['leftSeller']['speakingStatus'],
                            'rightSeller': batch['rightSeller']['speakingStatus']}
 
-        train_x = torch.cat((r, l), dim=0).float().cuda()
-        train_y = torch.cat((r, l), dim=0).float().cuda()
+        train_x = torch.cat((r, l), dim=0).float()
+        train_y = torch.cat((r, l), dim=0).float()
         return train_x, train_y
