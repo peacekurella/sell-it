@@ -204,14 +204,14 @@ class Metrics():
         targets = self.get_global_positions(targets)
 
         metrics = {
-            "RightMSE": Metrics.get_mse_loss(predictions[0], targets[0]).cpu().numpy().item(),
-            "LeftMSE": Metrics.get_mse_loss(predictions[1], targets[1]).cpu().numpy().item(),
+            "RightMSE": Metrics.get_mse_loss(predictions[0], targets[0][:, :predictions[0].shape[1]]).cpu().numpy().item(),
+            "LeftMSE": Metrics.get_mse_loss(predictions[1], targets[1][:, :predictions[1].shape[1]]).cpu().numpy().item(),
 
-            "RightNPSS": Metrics.get_npss_score(predictions[0], targets[0]),
-            "LeftNPSS": Metrics.get_npss_score(predictions[1], targets[1]),
+            "RightNPSS": Metrics.get_npss_score(predictions[0], targets[0][:, :predictions[0].shape[1]]),
+            "LeftNPSS": Metrics.get_npss_score(predictions[1], targets[1][:, :predictions[1].shape[1]]),
 
-            "RightFrechet": Metrics.get_frechet_distance(self, predictions[0], targets[0]),
-            "LeftFrechet": Metrics.get_frechet_distance(self, predictions[1], targets[1])
+            "RightFrechet": Metrics.get_frechet_distance(self, predictions[0], targets[0][:, :predictions[0].shape[1]]),
+            "LeftFrechet": Metrics.get_frechet_distance(self, predictions[1], targets[1][:, :predictions[1].shape[1]])
         }
         if len(predictions) == 4:
             metrics['right_speech_accuracy'] = self.get_speech_accuracy(predictions[3][0], targets[3][0])

@@ -160,7 +160,7 @@ def main(args):
 
     # set the wandb config
     config = FLAGS.flag_values_dict()
-    run = wandb.init(project="SellIt", config=config)
+    run = wandb.init(project="Sell-It", config=config)
 
     # initialize the model, log it for visualization
     model = get_model()
