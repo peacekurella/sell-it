@@ -2,22 +2,22 @@ program: train.py
 method: bayes
 early_terminate:
   type: hyperband
-  min_iter: 10
+  min_iter: 50
 metric:
   goal: minimize
-  name: Test/MSE
+  name: Test/Frechet
 parameters:
   model:
-    value: bodyAE
+    value: bmg
   learning_rate:
     distribution: log_uniform
     min: -9.2103403719
     max: -2.30258509292
   epochs:
-    value: 200
+    value: 400
   lmd:
     distribution: log_uniform
     min: -16
     max: 0.0
   batch_size:
-    value: 512
+    value: 128

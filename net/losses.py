@@ -50,6 +50,7 @@ def reconstruction_VAE(predictions, targets, model_params, FLAGS):
     target = targets['pose']
 
     lmd = FLAGS.lmd
+    lmd2 = FLAGS.lmd2
 
     # set the criterion objects for mse
     criterion1 = nn.MSELoss(reduction='mean')
@@ -64,7 +65,7 @@ def reconstruction_VAE(predictions, targets, model_params, FLAGS):
     loss_cycle = criterion1(z, z_star)
 
     loss = {
-        "Total_Loss": Reconstruction_Loss + lmd * loss_kld + 0.1 * loss_cycle,
+        "Total_Loss": Reconstruction_Loss + lmd * loss_kld + lmd2 * loss_cycle,
         "Reconstruction_Loss": Reconstruction_Loss,
         "Regularization_Loss": loss_kld,
         "CrossEntropy_Loss": torch.zeros(1)
