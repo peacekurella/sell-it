@@ -1,5 +1,11 @@
+import sys
 import numpy as np
 from scipy import linalg
+
+sys.path.append("net")
+sys.path.append("net/modelzoo")
+sys.path.append("net/basemodel")
+sys.path.append("motion")
 
 from EmbeddingNet import EmbeddingNet
 

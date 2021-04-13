@@ -6,7 +6,7 @@ import os
 from sklearn.metrics import accuracy_score
 from preprocess import export_frechet_animation
 
-from EmbeddingNet import EmbeddingNet
+
 from preprocess import MannDataFormat, HoldenDataFormat
 from HagglingDataset import HagglingDataset
 from Quaternions import Quaternions
@@ -27,9 +27,11 @@ class Metrics():
         self.frechet = FrechetEvaluation(FLAGS)
 
         self.skeleton = DebugVisualizer().humanSkeleton
-
+        print('got skeleton')
         self.output_folder = FLAGS.output_dir + FLAGS.model + '/'
         os.makedirs(self.output_folder, exist_ok=True)
+
+        print('metrics successfully loaded')
 
     @staticmethod
     def get_mse_loss(predictions, targets):
@@ -214,13 +216,18 @@ class Metrics():
             "LeftFrechet": Metrics.get_frechet_distance(self, predictions[1], targets[1][:, :predictions[1].shape[1]])
         }
         if len(predictions) == 4:
-            metrics['right_speech_accuracy'] = self.get_speech_accuracy(predictions[3][0], targets[3][0])
-            metrics['left_speech_accuracy'] = self.get_speech_accuracy(predictions[3][1], targets[3][1])
+            metrics['RightSpeech'] = self.get_speech_accuracy(predictions[3][0], targets[3][0])
+            metrics['LeftSpeech'] = self.get_speech_accuracy(predictions[3][1], targets[3][1])
+            metrics['Speech'] = (metrics['RightSpeech'] + metrics['LeftSpeech']) / 2
 
         idxs = random.sample(range(predictions[0].shape[0]), self.num_saves)
 
         for i in idxs:
             self.save_files(predictions[0], targets, 'right', i_batch, test_num, i)
             self.save_files(predictions[1], targets, 'left', i_batch, test_num, i)
+
+        metrics['MSE'] = (metrics['RightMSE'] + metrics['LeftMSE']) / 2
+        metrics['NPSS'] = (metrics['RightNPSS'] + metrics['LeftNPSS']) / 2
+        metrics['Frechet'] = (metrics['RightFrechet'] + metrics['LeftFrechet']) / 2
 
         return metrics

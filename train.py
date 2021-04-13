@@ -32,8 +32,8 @@ flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 1, 'Training epochs')
+flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 200, 'Training epochs')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
@@ -60,7 +60,7 @@ flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
@@ -185,6 +185,8 @@ def main(args):
     # run the training script
     for epoch in range(starting_epoch + 1, FLAGS.epochs + 1):
 
+        print(epoch)
+
         # initialize the total epoch loss values
         train_loss_logs = {
             'Train/Total_Loss': 0,
@@ -199,7 +201,14 @@ def main(args):
             'Train/RightNPSS': 0,
             'Train/LeftNPSS': 0,
             'Train/RightFrechet': 0,
-            'Train/LeftFrechet': 0
+            'Train/LeftFrechet': 0,
+            'Train/RightSpeech': 0,
+            'Train/LeftSpeech': 0,
+            'Train/MSE': 0,
+            'Train/NPSS': 0,
+            'Train/Frechet': 0,
+            'Train/Speech': 0
+
         }
 
         test_metric_logs = {
@@ -208,7 +217,13 @@ def main(args):
             'Test/RightNPSS': 0,
             'Test/LeftNPSS': 0,
             'Test/RightFrechet': 0,
-            'Test/LeftFrechet': 0
+            'Test/LeftFrechet': 0,
+            'Test/RightSpeech': 0,
+            'Test/LeftSpeech': 0,
+            'Test/MSE': 0,
+            'Test/NPSS': 0,
+            'Test/Frechet': 0,
+            'Test/Speech': 0
         }
 
         # set model to train mode
