@@ -29,7 +29,7 @@ flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
-flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model weights')
+flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
 flags.DEFINE_integer('batch_size', 64, 'Training set mini batch size')
