@@ -1,7 +1,5 @@
 import sys
 import wandb
-import glob
-import onnx
 
 from Metrics import Metrics
 from net.modelzoo.BodyAE import BodyAE
@@ -31,10 +29,10 @@ flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
-flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
+flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-flags.DEFINE_integer('batch_size', 1, 'Training set mini batch size')
+flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 1, 'Training epochs')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')

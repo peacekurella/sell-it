@@ -38,11 +38,11 @@ class BodyMotionGenerator(nn.Module):
         out = self.decoder(latent)
 
         prediction = {
-            "pose": out
+            "pose": out.permute(0, 2, 1)
         }
 
         target = {
-            "pose": y
+            "pose": y.permute(0, 2, 1)
         }
 
         return prediction, target
