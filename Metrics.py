@@ -25,8 +25,23 @@ class Metrics():
         self.haggling = HagglingDataset(FLAGS.test, FLAGS)
         self.num_saves = FLAGS.num_saves
         self.frechet = FrechetEvaluation(FLAGS)
-
-        self.skeleton = DebugVisualizer().humanSkeleton
+        print('got frechet model')
+        self.skeleton = [
+            [1, 5],
+            [0, 9],
+            [9, 10],
+            [10, 11],
+            [11, 12],
+            [5, 6],
+            [1, 2],
+            [6, 7],
+            [2, 3],
+            [13, 17],
+            [17, 18],
+            [13, 14],
+            [14, 15],
+            [18, 19]
+        ]
         print('got skeleton')
         self.output_folder = FLAGS.output_dir + FLAGS.model + '/'
         os.makedirs(self.output_folder, exist_ok=True)

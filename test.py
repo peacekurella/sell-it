@@ -21,7 +21,7 @@ from Metrics import Metrics
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
+flags.DEFINE_integer('batch_size', 256, 'Training set mini batch size')
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing test files')
 flags.DEFINE_string('output_dir', 'Data/output/', 'Folder to store final videos')
@@ -47,18 +47,18 @@ flags.DEFINE_integer('c_dim', 2, 'number of conditional variables added to laten
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
 flags.DEFINE_integer('frechet_pose_dim', 42, 'Number of joint directions')
-flags.DEFINE_string('frechet_ckpt', 'ckpt/frechet/', 'file containing the model weights')
+flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'input pose vector dimension')
-flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
 flags.DEFINE_bool('pretrain', False, 'Use a pretrained model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
-flags.DEFINE_integer('batch_runs', 1, 'Number of times give the same input to VAE')
-flags.DEFINE_integer('num_saves', 0, 'number of outputs to save')
-flags.DEFINE_integer('test_ckpt', 50, 'checkpoint to test')
+flags.DEFINE_integer('batch_runs', 5, 'Number of times give the same input to VAE')
+flags.DEFINE_integer('num_saves', 10, 'number of outputs to save')
+flags.DEFINE_integer('test_ckpt', None, 'checkpoint to test')
 flags.DEFINE_string('fmt', 'mann', 'data format')
 flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
 
@@ -100,7 +100,7 @@ def main(arg):
     with torch.no_grad():
         for i_batch, batch in enumerate(test_dataloader):
 
-            batch_runs = 1
+            batch_runs = FLAGS.batch_runs
             if FLAGS.VAE:
                 batch_runs = FLAGS.batch_runs
 

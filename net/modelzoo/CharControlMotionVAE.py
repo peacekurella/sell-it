@@ -25,6 +25,7 @@ class CharControlMotionVAE(nn.Module):
             self.predict_speech = True
         else:
             self.predict_speech = False
+        self.c_dim = FLAGS.c_dim
 
     def reparameterize(self, mu, log_var):
         """
@@ -72,16 +73,24 @@ class CharControlMotionVAE(nn.Module):
             teacher_forcing = False
 
         # iterate through all time steps
-        for t in range(1, x.shape[1]):
+        for t in range(1, 20):
             # do the encoding
             if teacher_forcing:
-                inp = torch.cat([x[:, t, :], y[:, t - 1, :], y[:, t, :]], dim=1)
+                inp = torch.cat([x[:, t, :], y[:, t - 1, :]], dim=1)
             else:
-                inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1), y[:, t, :]], dim=1)
+                inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1)], dim=1)
+
+            if self.c_dim == 2:
+                inp = torch.cat((inp, speakx[:, t, :]), dim=-1)
+            elif self.c_dim == 1:
+                if teacher_forcing:
+                    inp = torch.cat((inp, speaky[:, t - 1, :]), dim=-1)
+                else:
+                    inp = torch.cat((inp, torch.squeeze(speech_pred[-1], dim=1)), dim=-1)
 
             if self.training:
-                inp = torch.cat((inp, speakx[:, t, :]), dim=-1)
-                mu, log_var = self.encoder(inp)
+                enc_inp = torch.cat([y[:, t, :], inp], dim=1)
+                mu, log_var = self.encoder(enc_inp)
                 mus.append(torch.unsqueeze(mu, dim=1))
                 log_vars.append(torch.unsqueeze(log_var, dim=1))
 
@@ -90,16 +99,6 @@ class CharControlMotionVAE(nn.Module):
             else:
                 z = torch.randn((x.shape[0], self.latent_dim)).to(self.device)
 
-            # adding conditions to the latent dimension
-            # z = torch.cat((z, speakx[:, t, 1].unsqueeze(1)), dim=-1)
-
-            # do the decoding
-            if teacher_forcing:
-                inp = torch.cat([x[:, t, :], y[:, t - 1, :]], dim=1)
-            else:
-                inp = torch.cat([x[:, t, :], torch.squeeze(pose_pred[-1], dim=1)], dim=1)
-
-            inp = torch.cat((inp, speakx[:, t, :]), dim=-1)
             pose_pred.append(torch.unsqueeze(self.decoder(inp, z), dim=1))
 
             if self.predict_speech:
