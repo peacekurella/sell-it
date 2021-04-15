@@ -73,7 +73,7 @@ class CharControlMotionVAE(nn.Module):
             teacher_forcing = False
 
         # iterate through all time steps
-        for t in range(1, 20):
+        for t in range(1, x.shape[1]):
             # do the encoding
             if teacher_forcing:
                 inp = torch.cat([x[:, t, :], y[:, t - 1, :]], dim=1)

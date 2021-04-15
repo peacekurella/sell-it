@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 from scipy import linalg
+import torch
 
 sys.path.append("net")
 sys.path.append("net/modelzoo")
@@ -13,7 +14,8 @@ from EmbeddingNet import EmbeddingNet
 class FrechetEvaluation():
 
     def __init__(self, FLAGS):
-        self.frechet_net = EmbeddingNet(FLAGS.frechet_pose_dim, FLAGS.seq_length).cuda()
+        self.device = torch.device(FLAGS.device)
+        self.frechet_net = EmbeddingNet(FLAGS.frechet_pose_dim, FLAGS.seq_length).to(self.device).eval()
         self.frechet_net.load_model(FLAGS.frechet_ckpt, None)
 
     def frechet_distance(self, samples_A, samples_B):
