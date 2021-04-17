@@ -1,0 +1,32 @@
+program: train.py
+method: bayes
+metric:
+  goal: minimize
+  name: Test/Frechet
+parameters:
+  model:
+    value: MTVAE
+  learning_rate:
+    distribution: log_uniform
+    min: -9.2103403719
+    max: -2.30258509292
+  epochs:
+    value: 400
+  lmd:
+    distribution: log_uniform
+    min: -16
+    max: 0.0
+  batch_size:
+    value: 64
+  latent_dim:
+    value: 32
+  enc_dropout:
+    values: [0.2, 0.3, 0.4, 0.5]
+  dec_dropout:
+    values: [0.2, 0.3, 0.4, 0.5]
+  enc_hidden_units:
+    values: [128, 256, 512, 1024]
+  lmd2:
+    distribution: log_uniform
+    min: -16
+    max: 0.0

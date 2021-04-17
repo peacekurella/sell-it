@@ -14,7 +14,7 @@ class ConvEncoderSingle(nn.Module):
         # define the network
         self.network = nn.Sequential(
             nn.Dropout(0.25),
-            nn.Conv1d(73, 256, 25, padding=12),
+            nn.Conv1d(FLAGS.input_dim, 256, 25, padding=12),
             nn.ReLU(True),
             nn.MaxPool1d(kernel_size=2, stride=2)
         )

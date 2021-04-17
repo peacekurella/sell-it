@@ -16,7 +16,7 @@ class MVAEencoder(nn.Module):
 
         # define the model
         # TODO : replace 2 with a flag value
-        self.network = LinearModel(FLAGS, (FLAGS.input_dim * 4) + 2, FLAGS.enc_hidden_units, 'enc')
+        self.network = LinearModel(FLAGS, (FLAGS.input_dim * 4) + FLAGS.c_dim, FLAGS.enc_hidden_units, 'enc')
 
         # two outputs layers for mean and std to sample from
         self.output_mean = nn.Linear(FLAGS.enc_hidden_units, FLAGS.latent_dim)

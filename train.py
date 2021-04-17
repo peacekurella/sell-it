@@ -1,4 +1,12 @@
 import sys
+import wandb
+
+from Metrics import Metrics
+from net.modelzoo.BodyAE import BodyAE
+from net.modelzoo.BodyMotionGenerator import BodyMotionGenerator
+from net.modelzoo.CharControlMotionVAE import CharControlMotionVAE
+from net.modelzoo.ConvMotionTransformVAE import ConvMotionTransformVAE
+from net.modelzoo.LstmBodyAE import LstmBodyAE
 
 sys.path.append("net")
 sys.path.append("net/modelzoo")
@@ -6,38 +14,33 @@ sys.path.append("net/basemodel")
 sys.path.append("motion")
 
 import os
-import wandb
 from torch.utils.data import DataLoader
 
 from absl import app
 from absl import flags
 
 from HagglingDataset import HagglingDataset
-from BodyAE import BodyAE
-from BodyMotionGenerator import BodyMotionGenerator
-from LstmBodyAE import LstmBodyAE
-from ConvMotionTransformVAE import ConvMotionTransformVAE
-from CharControlMotionVAE import CharControlMotionVAE
 
-from losses import *
+from net.losses import *
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
-flags.DEFINE_string('ckpt_dir', 'ckpt_new/', 'Directory to store checkpoints')
+flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
+flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
+flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-
-flags.DEFINE_integer('batch_size', 48, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 400, 'Training epochs')
-flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate')
+flags.DEFINE_integer('batch_size', 1, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 200, 'Training epochs')
+flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder hidden units')
 flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
 flags.DEFINE_integer('gat_hidden_units', 256, 'Gating network hidden units')
-flags.DEFINE_integer('enc_layers', 3, 'encoder layers')
+flags.DEFINE_integer('enc_layers', 1, 'encoder layers')
 flags.DEFINE_integer('dec_layers', 1, 'decoder layers')
 flags.DEFINE_integer('num_experts', 8, 'number of experts in  decoder')
 flags.DEFINE_float('enc_dropout', 0.25, 'encoder dropout')
@@ -49,66 +52,23 @@ flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
 flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
-flags.DEFINE_integer('c_dim', 2, 'number of conditional variables added to latent dimension')
+flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to latent dimension')
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
-flags.DEFINE_bool('pretrain', False, 'pretrain the auto encoder')
+flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
 flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
-flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
-
-
-def get_inputs(batch):
-    """
-    Generates the inputs to the network
-    :param batch: batch for training
-    :return: train_x, train_y tensors
-    """
-    b = batch['buyer']['joints21']
-    l = batch['leftSeller']['joints21']
-    r = batch['rightSeller']['joints21']
-    speaking_status = {'buyer': batch['buyer']['speakingStatus'],
-                       'leftSeller': batch['leftSeller']['speakingStatus'],
-                       'rightSeller': batch['rightSeller']['speakingStatus']}
-
-    if FLAGS.pretrain:
-        if FLAGS.CNN:
-            train_x = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
-            train_y = torch.cat((l, r), dim=0).permute(0, 2, 1).float().cuda()
-            return train_x, train_y
-        else:
-            train_x = torch.cat((l, r), dim=0).float().cuda()
-            train_y = torch.cat((l, r), dim=0).float().cuda()
-            return train_x, train_y
-    else:
-        if FLAGS.CNN:
-            set_x_a = torch.cat((b, l), dim=2)
-            set_x_b = torch.cat((b, r), dim=2)
-            train_x = torch.cat((set_x_a, set_x_b), dim=0).permute(0, 2, 1).float().cuda()
-            train_y = torch.cat((r, l), dim=0).permute(0, 2, 1).float().cuda()
-            return train_x, train_y
-        else:
-            set_x_a = torch.cat((b, l), dim=2)
-            set_x_b = torch.cat((b, r), dim=2)
-            train_x = torch.cat((set_x_a, set_x_b), dim=0).float().cuda()
-            train_y = torch.cat((r, l), dim=0).float().cuda()
-            speak_a = torch.cat((speaking_status['buyer'], speaking_status['leftSeller']), dim=2)
-            speak_b = torch.cat((speaking_status['buyer'], speaking_status['rightSeller']), dim=2)
-            speak_x = torch.cat((speak_a, speak_b), dim=0).float().cuda()
-            speak_y = torch.cat((speaking_status['rightSeller'], speaking_status['leftSeller']), dim=0).float().cuda()
-            input = {
-                'trainx': train_x,
-                'trainy': train_y,
-                'speakx': speak_x,
-                'speaky': speak_y,
-            }
-            return input
+flags.DEFINE_integer('pretrained_ckpt', None, 'Number of epochs to checkpoint of pretrained model')
+flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
+flags.DEFINE_integer('num_saves', 0, 'number of output videos to save')
+flags.DEFINE_string('fmt', 'mann', 'data format')
+flags.DEFINE_integer('frechet_pose_dim', 42, 'Number of joint directions')
 
 
 def get_model():
@@ -118,15 +78,16 @@ def get_model():
     """
 
     if FLAGS.model == 'bodyAE':
-        return BodyAE(FLAGS).cuda()
-    if FLAGS.model == 'LstmAE':
-        return LstmBodyAE(FLAGS).cuda()
-    if FLAGS.model == 'MTVAE':
-        return ConvMotionTransformVAE(FLAGS).cuda()
-    if FLAGS.model == 'MVAE':
-        return CharControlMotionVAE(FLAGS).cuda()
+        x = BodyAE(FLAGS).to(torch.device(FLAGS.device))
+        return x
+    elif FLAGS.model == 'lstmAE':
+        return LstmBodyAE(FLAGS).to(torch.device(FLAGS.device))
+    elif FLAGS.model == 'MTVAE':
+        return ConvMotionTransformVAE(FLAGS).to(torch.device(FLAGS.device))
+    elif FLAGS.model == 'MVAE':
+        return CharControlMotionVAE(FLAGS).to(torch.device(FLAGS.device))
     else:
-        return BodyMotionGenerator(FLAGS).cuda()
+        return BodyMotionGenerator(FLAGS).to(torch.device(FLAGS.device))
 
 
 def get_loss_fn():
@@ -134,11 +95,10 @@ def get_loss_fn():
     Returns the appropriate loss function for training
     :return: loss function
     """
-    if FLAGS.VAE:
-        if FLAGS.model == "MTVAE":
-            return reconstruction_VAE
-        else:
-            return sequential_reconstruction_VAE
+    if FLAGS.model == "MTVAE":
+        return reconstruction_VAE
+    elif FLAGS.model == 'MVAE':
+        return sequential_reconstruction_VAE
     else:
         return reconstruction_l1
 
@@ -167,7 +127,7 @@ def get_scheduler(optimizer):
     return torch.optim.lr_scheduler.StepLR(optimizer, 5, gamma=0.95)
 
 
-def decay_p(p, epoch):
+def decay_p(p, epoch, model):
     """
     Returns the current value of p according to the progress in training
     :param p : degree of teacher forcing
@@ -179,47 +139,10 @@ def decay_p(p, epoch):
     elif epoch / FLAGS.epochs > FLAGS.end_scheduled_sampling:
         p = 0
 
-    return p
+    if FLAGS.model == 'MVAE':
+        model.set_teacher_forcing(p)
 
-
-def get_hyperparameters():
-    if FLAGS.model == "bodyAE":
-        hyperparameter_defaults = dict(
-            batch_size=FLAGS.batch_size,
-            learning_rate=FLAGS.learning_rate,
-            epochs=FLAGS.epochs,
-            lmd=FLAGS.lmd,
-            optimizer=FLAGS.optimizer
-        )
-    elif FLAGS.model == "MVAE":
-        hyperparameter_defaults = dict(
-            batch_size=FLAGS.batch_size,
-            learning_rate=FLAGS.learning_rate,
-            epochs=FLAGS.epochs,
-            lmd=FLAGS.lmd,
-            optimizer=FLAGS.optimizer,
-            latent_dim=FLAGS.latent_dim,
-            enc_hidden_units=FLAGS.enc_hidden_units,
-            dec_hidden_units=FLAGS.dec_hidden_units,
-            enc_layers=FLAGS.enc_layers,
-            enc_dropout=FLAGS.enc_dropout,
-            dec_dropout=FLAGS.dec_dropout
-        )
-    else:
-        hyperparameter_defaults = dict(
-            batch_size=FLAGS.batch_size,
-            learning_rate=FLAGS.learning_rate,
-            epochs=FLAGS.epochs,
-            lmd=FLAGS.lmd,
-            optimizer=FLAGS.optimizer,
-            enc_hidden_units=FLAGS.enc_hidden_units,
-            dec_hidden_units=FLAGS.dec_hidden_units,
-            enc_layers=FLAGS.enc_layers,
-            dec_layers=FLAGS.dec_layers,
-            dropout=FLAGS.dropout,
-            tf_ratio=FLAGS.tf_ratio
-        )
-    return hyperparameter_defaults
+    return
 
 
 def main(args):
@@ -233,132 +156,145 @@ def main(args):
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, shuffle=False, num_workers=10)
 
-    # get default_hyperparameters
-    hyperparameter_defaults = get_hyperparameters()
+    # set the wandb config
+    config = FLAGS.flag_values_dict()
+    run = wandb.init(project="Sell-It", config=config)
 
-    # initialize the model
+    # initialize the model, log it for visualization
     model = get_model()
-
-    run = wandb.init(project=FLAGS.model, config=hyperparameter_defaults)
+    try:
+        torch.onnx.export(model, next(iter(train_dataloader)),
+                          os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+        wandb.save(os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+    except Exception as e:
+        print(e)
 
     starting_epoch = 0
 
     # restore model if needed
     if FLAGS.resume_train:
-        if FLAGS.pretrain:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/AE/')
-        else:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/ME/')
+        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
         starting_epoch = model.load_model(ckpt, None)
-
-    # restore model partially if not pretraining
-    if not FLAGS.pretrain:
-        ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.pretrainedModel + '/AE/')
-        model.load_transfer_params(ckpt, None)
 
     # get the loss function and optimizers
     criterion = get_loss_fn()
     optimizer = get_optimizer(model.get_trainable_parameters())
-
     p = 1.0
 
-    # start watching the model for gradient info
-    # wandb.watch(model)
+    metrics = Metrics(FLAGS)
 
     # run the training script
     for epoch in range(starting_epoch + 1, FLAGS.epochs + 1):
 
+        print(epoch)
+
         # initialize the total epoch loss values
-        epoch_train_loss = 0.0
-        epoch_train_rec_loss = 0.0
-        epoch_train_reg_loss = 0.0
-        epoch_val_loss = 0.0
-        epoch_speech_loss = 0.0
+        train_loss_logs = {
+            'Train/Total_Loss': 0,
+            'Train/Reconstruction_Loss': 0,
+            'Train/Regularization_Loss': 0,
+            'Train/CrossEntropy_Loss': 0
+        }
+
+        train_metric_logs = {
+            'Train/RightMSE': 0,
+            'Train/LeftMSE': 0,
+            'Train/RightNPSS': 0,
+            'Train/LeftNPSS': 0,
+            'Train/RightFrechet': 0,
+            'Train/LeftFrechet': 0,
+            'Train/RightSpeech': 0,
+            'Train/LeftSpeech': 0,
+            'Train/MSE': 0,
+            'Train/NPSS': 0,
+            'Train/Frechet': 0,
+            'Train/Speech': 0
+
+        }
+
+        test_metric_logs = {
+            'Test/RightMSE': 0,
+            'Test/LeftMSE': 0,
+            'Test/RightNPSS': 0,
+            'Test/LeftNPSS': 0,
+            'Test/RightFrechet': 0,
+            'Test/LeftFrechet': 0,
+            'Test/RightSpeech': 0,
+            'Test/LeftSpeech': 0,
+            'Test/MSE': 0,
+            'Test/NPSS': 0,
+            'Test/Frechet': 0,
+            'Test/Speech': 0
+        }
 
         # set model to train mode
         model.train()
 
-        #  calculate training loss, update params
-        count_train = 0
+        # decay factor set
+        decay_p(p, epoch, model)
 
-        decay_p(p, epoch)
+        # run through all the batches
         for i_batch, batch in enumerate(train_dataloader):
             # zero prev gradients
             optimizer.zero_grad()
 
-            # get train input and labels
-            inputs = get_inputs(batch)
-
-            # forward pass through the network
-            if FLAGS.VAE:
-                predictions = model(inputs, p)
-            else:
-                predictions = model(inputs)
+            # forward pass through the net
+            predictions, targets = model(batch)
 
             # calculate loss
-            losses = criterion(predictions, inputs, model.parameters(), FLAGS)
-
-            total_loss = losses['total_loss']
-            rec_loss = losses['loss_mse']
-            reg_loss = losses['loss_kld']
-            speech_loss = losses['loss_speech']
-
-            epoch_train_loss += total_loss.detach().item()
-            epoch_train_rec_loss += rec_loss.detach().item()
-            epoch_train_reg_loss += reg_loss.detach().item()
-            epoch_speech_loss += speech_loss.detach().item()
-            count_train += 1
+            losses = criterion(predictions, targets, model.parameters(), FLAGS)
+            total_loss = losses['Total_Loss']
 
             # calculate gradients
             total_loss.backward()
             optimizer.step()
+
+            # compute train metrics
+            with torch.no_grad():
+                train_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
+                train_metric_logs = {
+                    'Train/' + key: train_metrics[key] + train_metric_logs['Train/' + key] for key in train_metrics
+                }
+                train_loss_logs = {
+                    'Train/' + key: losses[key].detach().cpu().numpy().item() + train_loss_logs['Train/' + key] for key
+                    in losses
+                }
 
         # set the model to evaluation mode
         model.eval()
 
         # calculate validation loss
         with torch.no_grad():
-            count_test = 0
             for i_batch, batch in enumerate(test_dataloader):
-                # get train input and labels
-                inputs = get_inputs(batch)
+                # forward pass through the net
+                predictions, targets = model(batch)
 
-                # forward pass through the network
-                if FLAGS.VAE:
-                    predictions = model(inputs, 0.0)
-                else:
-                    predictions = model(inputs)
+                # consolidate metrics
+                test_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
+                test_metric_logs = {
+                    'Test/' + key: test_metrics[key] + test_metric_logs['Test/' + key] for key in test_metrics
+                }
 
-                # calculate loss
-                val_loss = meanJointPoseError(predictions, inputs)
-                epoch_val_loss += val_loss.detach().item()
-                del val_loss
-                count_test += 1
-
-        # log the metrics
-        losses = {
-            'train_total_loss': epoch_train_loss / count_train,
-            'train_rec_loss': epoch_train_rec_loss / count_train,
-            'train_reg_loss': epoch_train_reg_loss / count_train,
-            'train_speech_loss': epoch_speech_loss/ count_train,
-            'val_loss': epoch_val_loss / count_test
+        # scale the metrics
+        train_metric_logs = {
+            key: train_metric_logs[key] / len(train_dataloader) for key in train_metric_logs
+        }
+        train_loss_logs = {
+            key: train_loss_logs[key] / len(train_dataloader) for key in train_loss_logs
+        }
+        test_metric_logs = {
+            key: test_metric_logs[key] / len(test_dataloader) for key in test_metric_logs
         }
 
-        print(losses)
-
-        wandb.log({
-            'train_total_loss': epoch_train_loss / count_train,
-            'train_rec_loss': epoch_train_rec_loss / count_train,
-            'train_reg_loss': epoch_train_reg_loss / count_train,
-            'train_speech_loss': epoch_speech_loss / count_train,
-            'val_loss': epoch_val_loss / count_test
+        # log all the metrics
+        run.log({
+            **train_metric_logs,
+            **train_loss_logs,
+            **test_metric_logs
         })
 
-        if epoch % FLAGS.ckpt == 0:
-            if FLAGS.pretrain:
-                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/AE/')
-            else:
-                ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/ME/')
+        if epoch % FLAGS.ckpt == 0 and epoch > 0:
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
             model.save_model(ckpt, epoch)
 
     run.finish()

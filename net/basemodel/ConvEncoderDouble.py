@@ -11,7 +11,7 @@ class ConvEncoderDouble(nn.Module):
         super(ConvEncoderDouble, self).__init__()
         self.network = nn.Sequential(
             nn.Dropout(0.25),
-            nn.Conv1d(146, 256, 45, padding=22),
+            nn.Conv1d(FLAGS.input_dim*2, 256, 45, padding=22),
             nn.ReLU(),
             nn.BatchNorm1d(256),
 

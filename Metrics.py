@@ -3,11 +3,15 @@ import torch
 import torch.nn as nn
 import random
 import os
+from sklearn.metrics import accuracy_score
+from preprocess import export_frechet_animation
+
 
 from preprocess import MannDataFormat, HoldenDataFormat
 from HagglingDataset import HagglingDataset
 from Quaternions import Quaternions
 from DebugVisualizer import DebugVisualizer
+from FrechetEvaluation import FrechetEvaluation
 
 
 class Metrics():
@@ -20,9 +24,29 @@ class Metrics():
 
         self.haggling = HagglingDataset(FLAGS.test, FLAGS)
         self.num_saves = FLAGS.num_saves
-
-        self.output_folder = FLAGS.output_dir
+        self.frechet = FrechetEvaluation(FLAGS)
+        print('got frechet model')
+        self.skeleton = [
+            [1, 5],
+            [0, 9],
+            [9, 10],
+            [10, 11],
+            [11, 12],
+            [5, 6],
+            [1, 2],
+            [6, 7],
+            [2, 3],
+            [13, 17],
+            [17, 18],
+            [13, 14],
+            [14, 15],
+            [18, 19]
+        ]
+        print('got skeleton')
+        self.output_folder = FLAGS.output_dir + FLAGS.model + '/'
         os.makedirs(self.output_folder, exist_ok=True)
+
+        print('metrics successfully loaded')
 
     @staticmethod
     def get_mse_loss(predictions, targets):
@@ -74,6 +98,41 @@ class Metrics():
 
         return np.average(emd, weights=seq_feature_power)
 
+    def get_frechet_distance(self, predictions, targets):
+        """
+        Calculate the frechet distance
+        :param predictions:
+        :param targets:
+        :return:
+        """
+
+        prediction_feat, _ = export_frechet_animation(predictions, self.skeleton)
+
+        prediction_feat = torch.from_numpy(prediction_feat).float().cuda()
+
+        gt_feat, _ = export_frechet_animation(targets, self.skeleton)
+
+        gt_feat = torch.from_numpy(gt_feat).float().cuda()
+
+        frechet_dist = self.frechet.frechet_distance(prediction_feat, gt_feat)
+
+        return frechet_dist
+
+    def get_speech_accuracy(self, predictions, targets):
+        """
+        Calculate speech accuracy
+        :param predictions: batch_size, seq_length, 1
+        :param targets: batch_size, seq_legnth, 1
+        :return : accuracy
+        """
+        predictions = (predictions > 0.5).astype(int).flatten()
+
+        targets = targets.flatten()
+
+        acc = accuracy_score(predictions, targets)
+
+        return acc
+
     def get_global_positions(self, subjects):
         """
             denormalize and globalize positions of humans
@@ -100,25 +159,26 @@ class Metrics():
     def split_into_subjects(self, predictions, targets, batch):
         # separate right and left seller
         haggling = self.haggling
+        batch_size = int(targets.shape[0] / 2)
 
-        r_target = haggling.denormalize_data(targets['trainy'][0].cpu().numpy())
-        r_prediction = haggling.denormalize_data(predictions[0].cpu().numpy())
-        l_target = haggling.denormalize_data(targets['trainy'][1].cpu().numpy())
-        l_prediction = haggling.denormalize_data(predictions[1].cpu().numpy())
-        buyer = haggling.denormalize_data(batch['buyer']['joints21'].cpu().numpy()[0])
+        r_target = haggling.denormalize_data(targets[0:batch_size].cpu().numpy())
+        r_prediction = haggling.denormalize_data(predictions[0:batch_size].cpu().numpy())
+        l_target = haggling.denormalize_data(targets[batch_size:].cpu().numpy())
+        l_prediction = haggling.denormalize_data(predictions[batch_size:].cpu().numpy())
+        buyer = haggling.denormalize_data(batch['buyer']['joints21'].cpu().numpy())
 
         # get initRot and initTrans
-        initRotRightSeller = Quaternions(batch['rightSeller']['initRot'][0].cpu().numpy())
-        initTransRightSeller = batch['rightSeller']['initTrans'][0].cpu().numpy()
-        initRotLeftSeller = Quaternions(batch['leftSeller']['initRot'][0].cpu().numpy())
-        initTransLeftSeller = batch['leftSeller']['initTrans'][0].cpu().numpy()
-        initRotBuyer = Quaternions(batch['buyer']['initRot'][0].cpu().numpy())
-        initTransBuyer = batch['buyer']['initTrans'][0].cpu().numpy()
+        initRotRightSeller = Quaternions(batch['rightSeller']['initRot'].cpu().numpy())
+        initTransRightSeller = batch['rightSeller']['initTrans'].cpu().numpy()
+        initRotLeftSeller = Quaternions(batch['leftSeller']['initRot'].cpu().numpy())
+        initTransLeftSeller = batch['leftSeller']['initTrans'].cpu().numpy()
+        initRotBuyer = Quaternions(batch['buyer']['initRot'].cpu().numpy())
+        initTransBuyer = batch['buyer']['initTrans'].cpu().numpy()
 
         prediction_subjects = [
             (r_prediction.copy(), initRotRightSeller, initTransRightSeller),
             (l_prediction.copy(), initRotLeftSeller, initTransLeftSeller),
-            (buyer.copy(), initRotBuyer, initTransBuyer)
+            (buyer.copy(), initRotBuyer, initTransBuyer),
         ]
 
         target_subjects = [
@@ -127,9 +187,15 @@ class Metrics():
             (buyer.copy(), initRotBuyer, initTransBuyer)
         ]
 
+        # if 'speech' in predictions:
+        #     prediction_subjects.append(
+        #         (predictions['speech'][:batch_size].cpu().numpy(), predictions['speech'][batch_size:].cpu().numpy()))
+        #     target_subjects.append((batch['rightSeller']['speakingStatus'].cpu().numpy(),
+        #                             batch['leftSeller']['speakingStatus'].cpu().numpy()))
+
         return prediction_subjects, target_subjects
 
-    def save_files(self, prediction, targets, role, i_batch, test_num):
+    def save_files(self, prediction, targets, role, i_batch, test_num, idx):
         # prepare skeletons to write in the video
         skel = []
 
@@ -137,36 +203,46 @@ class Metrics():
 
         # create skeletons
         for target in targets:
-            x = vis.conv_debug_visual_form(target)
+            x = vis.conv_debug_visual_form(target[idx])
             skel.append(x)
 
-        x = vis.conv_debug_visual_form(prediction)
+        x = vis.conv_debug_visual_form(prediction[idx])
         skel.append(x)
 
-        file_location = self.output_folder + str(i_batch) + '_' + str(test_num)
+        file_location = self.output_folder + str(test_num) + '_' + str(i_batch) + '_' + str(idx)
         os.makedirs(file_location, exist_ok=True)
         vis.create_animation(skel, file_location + '/' + role)
+        del vis
 
     def compute_and_save(self, predictions, targets, batch, i_batch, test_num):
-        predictions, targets = self.split_into_subjects(predictions['pose_pred'], targets, batch)
+        predictions, targets = self.split_into_subjects(predictions['pose'], targets['pose'], batch)
 
         predictions = self.get_global_positions(predictions)
         targets = self.get_global_positions(targets)
 
-        metrics = [
-            [
-                Metrics.get_mse_loss(predictions[0], targets[0]),
-                Metrics.get_mse_loss(predictions[1], targets[1])
-            ],
-            [
-                Metrics.get_npss_score(predictions[0], targets[0]),
-                Metrics.get_npss_score(predictions[1], targets[1])
-            ]
-        ]
+        metrics = {
+            "RightMSE": Metrics.get_mse_loss(predictions[0], targets[0][:, :predictions[0].shape[1]]).cpu().numpy().item(),
+            "LeftMSE": Metrics.get_mse_loss(predictions[1], targets[1][:, :predictions[1].shape[1]]).cpu().numpy().item(),
 
-        if 0.4 < random.random() < 0.5 and self.num_saves > 0:
-            self.save_files(predictions[0], targets, 'right', i_batch, test_num)
-            self.save_files(predictions[1], targets, 'left', i_batch, test_num)
-            self.num_saves -= 1
+            "RightNPSS": Metrics.get_npss_score(predictions[0], targets[0][:, :predictions[0].shape[1]]),
+            "LeftNPSS": Metrics.get_npss_score(predictions[1], targets[1][:, :predictions[1].shape[1]]),
+
+            "RightFrechet": Metrics.get_frechet_distance(self, predictions[0], targets[0][:, :predictions[0].shape[1]]),
+            "LeftFrechet": Metrics.get_frechet_distance(self, predictions[1], targets[1][:, :predictions[1].shape[1]])
+        }
+        if len(predictions) == 4:
+            metrics['RightSpeech'] = self.get_speech_accuracy(predictions[3][0], targets[3][0])
+            metrics['LeftSpeech'] = self.get_speech_accuracy(predictions[3][1], targets[3][1])
+            metrics['Speech'] = (metrics['RightSpeech'] + metrics['LeftSpeech']) / 2
+
+        idxs = random.sample(range(predictions[0].shape[0]), self.num_saves)
+
+        for i in idxs:
+            self.save_files(predictions[0], targets, 'right', i_batch, test_num, i)
+            self.save_files(predictions[1], targets, 'left', i_batch, test_num, i)
+
+        metrics['MSE'] = (metrics['RightMSE'] + metrics['LeftMSE']) / 2
+        metrics['NPSS'] = (metrics['RightNPSS'] + metrics['LeftNPSS']) / 2
+        metrics['Frechet'] = (metrics['RightFrechet'] + metrics['LeftFrechet']) / 2
 
         return metrics

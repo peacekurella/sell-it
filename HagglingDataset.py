@@ -80,6 +80,6 @@ class HagglingDataset(Dataset):
         :return: denormalized joint data of shape (F, output_shape)
         """
 
-        x = joints21 * self.std
-        x = x + self.mean
+        x = joints21 * self.std[np.newaxis, :, :]
+        x = x + self.mean[np.newaxis, :, :]
         return x

@@ -89,7 +89,8 @@ class EmbeddingNet(nn.Module):
             self.encoder.load_state_dict(torch.load(enc_path))
             self.decoder.load_state_dict(torch.load(dec_path))
             print("Load successful!")
-        except:
+        except Exception as e:
+            print(e)
             print("Load failed!")
             return 0
 
