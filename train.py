@@ -26,13 +26,13 @@ from net.losses import *
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
-flags.DEFINE_string('train', 'MannData/train/', 'Directory containing train files')
-flags.DEFINE_string('test', 'MannData/test/', 'Directory containing train files')
+flags.DEFINE_string('train', 'HoldenData/train/', 'Directory containing train files')
+flags.DEFINE_string('test', 'HoldenData/test/', 'Directory containing train files')
 flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-flags.DEFINE_integer('batch_size', 1, 'Training set mini batch size')
+flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
 flags.DEFINE_integer('epochs', 200, 'Training epochs')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
 flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
@@ -56,18 +56,18 @@ flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to laten
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
 
-flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
-flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
+flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
+flags.DEFINE_integer('output_dim', 73, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "bodyAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 flags.DEFINE_integer('pretrained_ckpt', None, 'Number of epochs to checkpoint of pretrained model')
 flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
 flags.DEFINE_integer('num_saves', 0, 'number of output videos to save')
-flags.DEFINE_string('fmt', 'mann', 'data format')
+flags.DEFINE_string('fmt', 'holden', 'data format')
 flags.DEFINE_integer('frechet_pose_dim', 42, 'Number of joint directions')
 
 
