@@ -21,3 +21,5 @@ parameters:
     max: 0.0
   batch_size:
     value: 128
+  pretrainedModel:
+    value: bodyAE
