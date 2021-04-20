@@ -21,3 +21,5 @@ parameters:
     max: 0.0
   batch_size:
     value: 512
+  skip_train_metrics:
+    value: True
