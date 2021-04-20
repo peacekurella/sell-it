@@ -23,3 +23,5 @@ parameters:
     value: 128
   pretrainedModel:
     value: bodyAE
+  skip_train_metrics:
+    value: True

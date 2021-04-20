@@ -55,6 +55,7 @@ flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampli
 flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to latent dimension')
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
+flags.DEFINE_bool('skip_train_metrics', True, 'skip calculation of train metrics')
 
 flags.DEFINE_integer('input_dim', 73, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 73, 'output pose vector dimension')
@@ -251,10 +252,12 @@ def main(args):
 
             # compute train metrics
             with torch.no_grad():
-                train_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
-                train_metric_logs = {
-                    'Train/' + key: train_metrics[key] + train_metric_logs['Train/' + key] for key in train_metrics
-                }
+                if not FLAGS.skip_train_metrics:
+                    train_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
+                    train_metric_logs = {
+                        'Train/' + key: train_metrics[key] + train_metric_logs['Train/' + key] for key in train_metrics
+                    }
+
                 train_loss_logs = {
                     'Train/' + key: losses[key].detach().cpu().numpy().item() + train_loss_logs['Train/' + key] for key
                     in losses

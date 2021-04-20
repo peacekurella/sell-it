@@ -419,39 +419,43 @@ class HoldenDataFormat:
         :param initTrans: initial translation of the skeleton
         :return:
         """
+        recovered_joints = []
 
-        # split into joints and root velocities
-        joints = processed[:, :-7]
-        root_x, root_z, root_r = processed[:, -7], processed[:, -6], processed[:, -5]
+        for k in range(processed.shape[0]):
 
-        # reshape into the right format
-        joints = joints.reshape(len(joints), -1, 3)
+            # split into joints and root velocities
+            joints = processed[k, :, :-7]
+            root_x, root_z, root_r = processed[k, :, -7], processed[k, :, -6], processed[k, :, -5]
 
-        # set initial rotation and translation
-        if initRot is None:
-            rotation = Quaternions.id(1)
-        else:
-            rotation = initRot
+            # reshape into the right format
+            joints = joints.reshape(len(joints), -1, 3)
 
-        if initTrans is None:
-            translation = np.array([[0, 0, 0]])
-        else:
-            translation = initTrans
+            # set initial rotation and translation
+            if initRot is None:
+                rotation = Quaternions.id(1)
+            else:
+                rotation = initRot[k]
 
-        # maintain a list of the offsets
-        offsets = []
+            if initTrans is None:
+                translation = np.array([[0, 0, 0]])
+            else:
+                translation = initTrans[k]
 
-        # integrate over time to recover original values
-        for i in range(len(joints)):
-            joints[i, :, :] = rotation * joints[i]
-            joints[i, :, 0] = joints[i, :, 0] + translation[0, 0]
-            joints[i, :, 2] = joints[i, :, 2] + translation[0, 2]
-            rotation = Quaternions.from_angle_axis(-root_r[i], np.array([0, 1, 0])) * rotation
-            offsets.append(rotation * np.array([0, 0, 1]))
-            translation = translation + rotation * np.array([root_x[i], 0, root_z[i]])
+            # maintain a list of the offsets
+            offsets = []
 
-        joints = HoldenDataFormat.floor_skelton(joints[:, 1:])
-        return filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest')
+            # integrate over time to recover original values
+            for i in range(len(joints)):
+                joints[i, :, :] = rotation * joints[i]
+                joints[i, :, 0] = joints[i, :, 0] + translation[0, 0]
+                joints[i, :, 2] = joints[i, :, 2] + translation[0, 2]
+                rotation = Quaternions.from_angle_axis(-root_r[i], np.array([0, 1, 0])) * rotation
+                offsets.append(rotation * np.array([0, 0, 1]))
+                translation = translation + rotation * np.array([root_x[i], 0, root_z[i]])
+
+            joints = HoldenDataFormat.floor_skelton(joints[:, 1:])
+            recovered_joints.append(filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest'))
+        return np.array(recovered_joints)
 
 
 def export_holden_data(input_directory, output_directory, window_length, stride):
