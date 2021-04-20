@@ -5,7 +5,7 @@ early_terminate:
   min_iter: 50
 metric:
   goal: minimize
-  name: Test/Frechet
+  name: Test/MSE
 parameters:
   model:
     value: bmg
@@ -14,7 +14,7 @@ parameters:
     min: -9.2103403719
     max: -2.30258509292
   epochs:
-    value: 400
+    value: 200
   lmd:
     distribution: log_uniform
     min: -16
