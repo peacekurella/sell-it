@@ -272,11 +272,14 @@ def main(args):
                 # forward pass through the net
                 predictions, targets = model(batch)
 
-                # consolidate metrics
-                test_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
-                test_metric_logs = {
-                    'Test/' + key: test_metrics[key] + test_metric_logs['Test/' + key] for key in test_metrics
-                }
+                if FLAGS.model == 'bodyAE' or FLAGS.model == 'bmg':
+                    test_metric_logs['Test/MSE'] = meanJointPoseError(predictions, targets)
+                else:
+                    # consolidate metrics
+                    test_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
+                    test_metric_logs = {
+                        'Test/' + key: test_metrics[key] + test_metric_logs['Test/' + key] for key in test_metrics
+                    }
 
         # scale the metrics
         train_metric_logs = {

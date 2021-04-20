@@ -2,6 +2,19 @@ import torch
 import torch.nn as nn
 
 
+def meanJointPoseError(predictions, targets):
+    """
+    Defines an MSE loss
+    :param predictions: predictions from the model
+    :param targets: ground truths
+    :return: average loss for the predicition
+    """
+    pose_pred = predictions['pose']
+    pose_gt = targets['pose']
+    loss = nn.MSELoss(reduction='mean')
+    return loss(pose_pred, pose_gt)
+
+
 def reconstruction_l1(predictions, targets, model_params, FLAGS):
     """
     Defines a reconstruction loss with L1 regularization loss
