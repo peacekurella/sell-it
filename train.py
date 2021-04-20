@@ -33,9 +33,9 @@ flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model 
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
 flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 200, 'Training epochs')
-flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
-flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
+flags.DEFINE_integer('epochs', 400, 'Training epochs')
+flags.DEFINE_float('learning_rate', 0.06685, 'Initial learning rate')
+flags.DEFINE_float('lmd', 9.042e-7, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder hidden units')
 flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
