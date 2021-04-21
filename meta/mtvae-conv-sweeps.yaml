@@ -11,7 +11,7 @@ parameters:
     min: -9.2103403719
     max: -2.30258509292
   epochs:
-    value: 400
+    value: 300
   lmd:
     distribution: log_uniform
     min: -16
@@ -30,3 +30,7 @@ parameters:
     distribution: log_uniform
     min: -16
     max: 0.0
+  skip_train_metrics:
+    value: False
+  pretrainedModel:
+    value: bodyAE_mann

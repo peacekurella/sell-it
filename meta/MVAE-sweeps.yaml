@@ -2,20 +2,20 @@ program: train.py
 method: bayes
 metric:
   goal: minimize
-  name: val_loss
+  name: Test/Frechet
 parameters:
   model:
     value: MVAE
-    learning_rate:
-      distribution: log_uniform
-      min: -9.2103403719
-      max: -2.30258509292
-    epochs:
-      value: 400
-    lmd:
-      distribution: log_uniform
-      min: -16
-      max: 0.0
+  learning_rate:
+    distribution: log_uniform
+    min: -9.2103403719
+    max: -2.30258509292
+  epochs:
+    value: 400
+  lmd:
+    distribution: log_uniform
+    min: -16
+    max: 0.0
   latent_dim:
     value: [32, 48]
   enc_dropout:
@@ -28,3 +28,11 @@ parameters:
     values: [ 3, 4, 5, 6, 7, 8, 9, 10]
   c_dim:
     value: 2
+  lmd2:
+    distribution: log_uniform
+    min: -16
+    max: 0.0
+  skip_train_metrics:
+    value: False
+  batch_size:
+    value: 48
