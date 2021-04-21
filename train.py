@@ -273,7 +273,7 @@ def main(args):
                 predictions, targets = model(batch)
 
                 if FLAGS.model == 'bodyAE' or FLAGS.model == 'bmg':
-                    test_metric_logs['Test/MSE'] = meanJointPoseError(predictions, targets)
+                    test_metric_logs['Test/MSE'] += meanJointPoseError(predictions, targets)
                 else:
                     # consolidate metrics
                     test_metrics = metrics.compute_and_save(predictions, targets, batch, i_batch, None)
