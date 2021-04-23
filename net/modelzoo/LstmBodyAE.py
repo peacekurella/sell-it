@@ -45,9 +45,6 @@ class LstmBodyAE(nn.Module):
         # pass through encoder
         # discard the context vector and only use hidden state
         latent = self.encoder(x)
-        h, c = latent
-        # c = torch.zeros(h.shape).cuda()
-        latent = (h, c)
 
         # if teacher forcing the network
         predictions = []

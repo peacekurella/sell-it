@@ -17,6 +17,7 @@ class LstmEncoder(nn.Module):
         self.hidden_units = FLAGS.enc_hidden_units
         self.input_dim = FLAGS.input_dim
         self.num_layers = FLAGS.enc_layers
+        self.device = torch.device(FLAGS.device)
 
         # Encoder LSTM
         self.lstm = nn.LSTM(
@@ -38,13 +39,13 @@ class LstmEncoder(nn.Module):
         """
 
         # shape should be batch_size, num_layers, number of hidden units
-        return torch.zeros((self.num_layers, batch_size, self.hidden_units)).cuda()
+        return torch.zeros((self.num_layers, batch_size, self.hidden_units)).to(self.device)
 
     def forward(self, input):
         """
         Defines a forward pass through the network
         :param input: Input to the network of shape (batch_size, seq_length, input_dim)
-        :return: Latent (h, c) output from the network ((batch_size, num_layers, hidden_units)*2)
+        :return: Latent (h, c) output from the network ((num_layers, batch_size, hidden_units)*2)
         """
 
         # initialize the hidden state

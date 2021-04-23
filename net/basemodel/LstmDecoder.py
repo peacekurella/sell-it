@@ -19,6 +19,7 @@ class LstmDecoder(nn.Module):
         self.input_dim = FLAGS.input_dim
         self.output_dim = FLAGS.output_dim
         self.num_layers = FLAGS.dec_layers
+        self.device = torch.device(FLAGS.device)
 
         # Encoder LSTM
         self.lstm = nn.LSTM(
@@ -43,7 +44,7 @@ class LstmDecoder(nn.Module):
         """
 
         # shape should be batch_size, 1, number of hidden units
-        return torch.zeros((self.num_layers, batch_size, self.hidden_units)).cuda()
+        return torch.zeros((self.num_layers, batch_size, self.hidden_units)).to(self.device)
 
     def forward(self, input, latent):
         """
@@ -55,10 +56,9 @@ class LstmDecoder(nn.Module):
         """
 
         # dropout before input to make it robust to noise
-        for t in range(input.shape[1]):
-            x = self.dropout(input[:, t])
-            output, latent = self.lstm(torch.unsqueeze(x, 1), latent)
-            output = self.linear(output)
-            output = torch.tanh(output)
+        x = self.dropout(input)
+        output, latent = self.lstm(x, latent)
+        output = self.linear(output)
+        output = torch.tanh(output)
 
         return output, latent

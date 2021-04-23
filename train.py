@@ -7,6 +7,7 @@ from net.modelzoo.BodyMotionGenerator import BodyMotionGenerator
 from net.modelzoo.CharControlMotionVAE import CharControlMotionVAE
 from net.modelzoo.ConvMotionTransformVAE import ConvMotionTransformVAE
 from net.modelzoo.LstmBodyAE import LstmBodyAE
+from net.modelzoo.LSTMMotionTransformVAE import LSTMMotionTransformVAE
 
 sys.path.append("net")
 sys.path.append("net/modelzoo")
@@ -32,10 +33,10 @@ flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-flags.DEFINE_integer('batch_size', 512, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 400, 'Training epochs')
-flags.DEFINE_float('learning_rate', 0.06685, 'Initial learning rate')
-flags.DEFINE_float('lmd', 9.042e-7, 'Regularization factor')
+flags.DEFINE_integer('batch_size', 128, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 200, 'Training epochs')
+flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
+flags.DEFINE_float('lmd', 0.1, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder hidden units')
 flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
@@ -55,20 +56,20 @@ flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampli
 flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to latent dimension')
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
-flags.DEFINE_bool('skip_train_metrics', False, 'skip calculation of train metrics')
+flags.DEFINE_bool('skip_train_metrics', True, 'skip calculation of train metrics')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "MTVAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "LMTVAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
-flags.DEFINE_string('pretrainedModel', 'bodyAE_mann', 'path to pretrained weights')
-flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
+flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
+flags.DEFINE_integer('ckpt', 1, 'Number of epochs to checkpoint')
 flags.DEFINE_integer('pretrained_ckpt', None, 'Number of epochs to checkpoint of pretrained model')
 flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
 flags.DEFINE_integer('num_saves', 0, 'number of output videos to save')
-flags.DEFINE_string('fmt', 'holden', 'data format')
+flags.DEFINE_string('fmt', 'mann', 'data format')
 flags.DEFINE_integer('frechet_pose_dim', 42, 'Number of joint directions')
 
 
@@ -85,6 +86,8 @@ def get_model():
         return LstmBodyAE(FLAGS).to(torch.device(FLAGS.device))
     elif FLAGS.model == 'MTVAE':
         return ConvMotionTransformVAE(FLAGS).to(torch.device(FLAGS.device))
+    elif FLAGS.model == 'LMTVAE':
+        return LSTMMotionTransformVAE(FLAGS).to(torch.device(FLAGS.device))
     elif FLAGS.model == 'MVAE':
         return CharControlMotionVAE(FLAGS).to(torch.device(FLAGS.device))
     else:
@@ -96,7 +99,7 @@ def get_loss_fn():
     Returns the appropriate loss function for training
     :return: loss function
     """
-    if FLAGS.model == "MTVAE":
+    if FLAGS.model == "MTVAE" or FLAGS.model == 'LMTVAE':
         return reconstruction_VAE
     elif FLAGS.model == 'MVAE':
         return sequential_reconstruction_VAE
@@ -140,7 +143,7 @@ def decay_p(p, epoch, model):
     elif epoch / FLAGS.epochs > FLAGS.end_scheduled_sampling:
         p = 0
 
-    if FLAGS.model == 'MVAE':
+    if FLAGS.model == 'MVAE' or FLAGS.model == 'LMTVAE':
         model.set_teacher_forcing(p)
 
     return
@@ -163,12 +166,12 @@ def main(args):
 
     # initialize the model, log it for visualization
     model = get_model()
-    try:
-        torch.onnx.export(model, next(iter(train_dataloader)),
-                          os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
-        wandb.save(os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
-    except Exception as e:
-        print(e)
+    # try:
+    #     torch.onnx.export(model, next(iter(train_dataloader)),
+    #                       os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+    #     wandb.save(os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/model.onnx'))
+    # except Exception as e:
+    #     print(e)
 
     starting_epoch = 0
 
@@ -176,6 +179,7 @@ def main(args):
     if FLAGS.resume_train:
         ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
         starting_epoch = model.load_model(ckpt, None)
+        starting_epoch = 90
 
     # get the loss function and optimizers
     criterion = get_loss_fn()
@@ -300,7 +304,7 @@ def main(args):
         })
 
         if epoch % FLAGS.ckpt == 0 and epoch > 0:
-            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
+            ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/' + wandb.run.name + '/')
             model.save_model(ckpt, epoch)
 
     run.finish()

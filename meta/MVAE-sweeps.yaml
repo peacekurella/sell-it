@@ -8,7 +8,7 @@ parameters:
     value: MVAE
   learning_rate:
     distribution: log_uniform
-    min: -9.2103403719
+    min: -4.7
     max: -2.30258509292
   epochs:
     value: 400
@@ -17,15 +17,15 @@ parameters:
     min: -16
     max: 0.0
   latent_dim:
-    value: [32, 48]
+    value: 32
   enc_dropout:
-    values: [0.2, 0.3, 0.4, 0.5]
+    value: 0.25
   dec_dropout:
-      values: [0.2, 0.3, 0.4, 0.5]
+      value: 0.25
   enc_hidden_units:
-    values: [128, 256, 512]
+    value: 256
   num_experts:
-    values: [ 3, 4, 5, 6, 7, 8, 9, 10]
+    values: [ 3, 6, 8, 12]
   c_dim:
     value: 2
   lmd2:
@@ -35,4 +35,4 @@ parameters:
   skip_train_metrics:
     value: False
   batch_size:
-    value: 48
+    value: 32

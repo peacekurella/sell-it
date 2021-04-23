@@ -55,10 +55,10 @@ def reconstruction_VAE(predictions, targets, model_params, FLAGS):
     """
     del model_params
     prediction = predictions['pose']
-    mu = predictions['mu']
-    log_var = predictions['log_var']
-    z = predictions['z']
-    z_star = predictions['z_star']
+    mu = predictions['mu'].reshape(-1, FLAGS.latent_dim)
+    log_var = predictions['log_var'].reshape(-1, FLAGS.latent_dim)
+    z = predictions['z'].reshape(-1, FLAGS.latent_dim)
+    z_star = predictions['z_star'].reshape(-1, FLAGS.latent_dim)
 
     target = targets['pose']
 
