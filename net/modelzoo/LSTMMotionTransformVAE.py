@@ -35,8 +35,8 @@ class LSTMMotionTransformVAE(nn.Module):
         self.input_dim = FLAGS.input_dim
         self.device = torch.device(FLAGS.device)
         pretrained_ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.pretrainedModel + '/')
-        # if not self.load_transfer_params(pretrained_ckpt, FLAGS.pretrained_ckpt):
-        #     raise Exception("AE model needs to be trained")
+        if not self.load_transfer_params(pretrained_ckpt, FLAGS.pretrained_ckpt):
+            raise Exception("AE model needs to be trained")
 
     def reparameterize(self, mu, log_var):
         """
