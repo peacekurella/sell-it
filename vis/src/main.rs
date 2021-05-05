@@ -15,6 +15,9 @@ use std::env;
 use std::fs::File;
 use std::io::BufReader;
 
+struct FPSStep(usize);
+struct FPSCount(usize);
+
 fn main() {
     // Load from file
     let args = env::args().collect::<Vec<String>>();
@@ -40,6 +43,8 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(CameraPlugin)
         .add_plugin(StatusBarPlugin)
+        .insert_resource(FPSCount(0))
+        .insert_resource(FPSStep(4))
         .add_plugin(PausePlugin)
         .add_system(bevy::input::system::exit_on_esc_system.system())
         .add_plugin(GroundPlugin)
@@ -50,6 +55,8 @@ fn main() {
 
 fn control(
     pause: Res<Pause>,
+    mut count: ResMut<FPSCount>,
+    step: Res<FPSStep>,
     mut frame_number: ResMut<FrameNumber>,
     skeletons: Res<Vec<SkeletonVideo>>,
     mut root_query: Query<(&Bone, &mut Transform)>,
@@ -58,16 +65,19 @@ fn control(
     if pause.0 {
         return;
     }
-    for (idx, mut transform) in root_query.iter_mut() {
-        let skeleton_idx = idx.0;
-        let bone_idx = idx.1;
-        let (_, trans, rot) = skeletons[skeleton_idx].bone(bone_idx, frame_number.0);
-        transform.translation = trans;
-        transform.rotation = rot;
+    if count.0 % step.0 == 0 {
+        for (idx, mut transform) in root_query.iter_mut() {
+            let skeleton_idx = idx.0;
+            let bone_idx = idx.1;
+            let (_, trans, rot) = skeletons[skeleton_idx].bone(bone_idx, frame_number.0);
+            transform.translation = trans;
+            transform.rotation = rot;
+        }
+        if frame_number.0 + 1 < skeletons[0].num_frames() {
+            frame_number.0 += 1;
+        } else {
+            frame_number.0 = 0;
+        }
     }
-    if frame_number.0 + 1 < skeletons[0].num_frames() {
-        frame_number.0 += 1;
-    } else {
-        frame_number.0 = 0;
-    }
+    count.0 += 1;
 }
