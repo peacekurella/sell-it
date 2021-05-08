@@ -11,26 +11,26 @@ parameters:
     min: -9.2103403719
     max: -2.30258509292
   epochs:
-    value: 300
+    value: 200
   lmd:
     distribution: log_uniform
     min: -16
     max: 0.0
   batch_size:
-    value: 64
+    value: 128
   latent_dim:
     value: 32
   enc_dropout:
-    values: [0.2, 0.3, 0.4, 0.5]
+    values: [0.2, 0.3]
   dec_dropout:
-    values: [0.2, 0.3, 0.4, 0.5]
+    values: [0.2, 0.3]
   enc_hidden_units:
-    values: [128, 256, 512, 1024]
+    values: [128, 256, 512]
   lmd2:
     distribution: log_uniform
     min: -16
     max: 0.0
   skip_train_metrics:
-    value: False
+    value: True
   pretrainedModel:
-    value: bodyAE_mann
+    value: bodyAE

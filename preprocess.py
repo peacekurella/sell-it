@@ -454,6 +454,7 @@ class HoldenDataFormat:
                 translation = translation + rotation * np.array([root_x[i], 0, root_z[i]])
 
             joints = HoldenDataFormat.floor_skelton(joints[:, 1:])
+            # joints = joints[:, 1:]
             recovered_joints.append(filters.gaussian_filter1d(joints, 1, axis=0, mode='nearest'))
         return np.array(recovered_joints)
 

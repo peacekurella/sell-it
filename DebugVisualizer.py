@@ -44,6 +44,23 @@ class DebugVisualizer:
             [18, 19]
         ]
 
+        self.humanSkeleton_19_joints = [
+            [0, 1],
+            [0, 3],
+            [3, 4],
+            [4, 5],
+            [0, 2],
+            [2, 6],
+            [6, 7],
+            [7, 8],
+            [2, 12],
+            [12, 13],
+            [13, 14],
+            [0, 9],
+            [9, 10],
+            [10, 11]
+        ]
+
         # add the joints and the marker colors
         # setup the frame layout
         self.fig = plt.figure()
@@ -184,6 +201,26 @@ class DebugVisualizer:
         for i in range(points.shape[0]):
             ax.scatter(points[i][0], points[i][1], points[i][2])
             ax.text(points[i][0], points[i][1], points[i][2], str(i))
+
+        bones = self.humanSkeleton
+        for i in range(len(bones)):
+            start, end = bones[i]
+            xs = [points[start][0], points[end][0]]
+            ys = [points[start][1], points[end][1]]
+            zs = [points[start][2], points[end][2]]
+            ax.plot3D(xs, ys, zs)
+
+        ax.set_xlim3d(-200, 200)
+        ax.set_ylim3d(0, 200)
+        ax.set_zlim3d(-300, 100)
+
+        # Hide grid lines
+        # ax.grid(False)
+
+        # Hide axes ticks
+        # ax.set_xticks([])
+        # ax.set_yticks([])
+        # ax.set_zticks([])
 
         plt.xlabel('X')
         plt.ylabel('Y')

@@ -24,7 +24,7 @@ pub fn init_camera(mut commands: Commands) {
             key_right: KeyCode::D,
             key_forward: KeyCode::W,
             key_backward: KeyCode::S,
-            sensitivity: 3.0,
+            sensitivity: 100.0,
             ..Default::default()
         });
 }

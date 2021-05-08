@@ -25,7 +25,7 @@ flags.DEFINE_integer('batch_size', 256, 'Training set mini batch size')
 flags.DEFINE_string('meta', 'meta/', 'Directory containing metadata files')
 flags.DEFINE_string('test', 'MannData/test/', 'Directory containing test files')
 flags.DEFINE_string('output_dir', 'Data/output/', 'Folder to store final videos')
-flags.DEFINE_string('ckpt', 'ckpt/', 'file containing the model weights')
+flags.DEFINE_string('ckpt_dir', 'ckpt/', 'file containing the model weights')
 flags.DEFINE_float('lmd', 0.2, 'L1 Regularization factor')
 flags.DEFINE_boolean('bodyae', False, 'if True checks BodyAE model')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder LSTM hidden units')
@@ -43,7 +43,7 @@ flags.DEFINE_integer('seq_length', 120, 'time steps in the sequence')
 flags.DEFINE_integer('latent_dim', 32, 'latent dimension')
 flags.DEFINE_float('start_scheduled_sampling', 0.2, 'when to start scheduled sampling')
 flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampling')
-flags.DEFINE_integer('c_dim', 2, 'number of conditional variables added to latent dimension')
+flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to latent dimension')
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
 flags.DEFINE_integer('frechet_pose_dim', 42, 'Number of joint directions')
@@ -57,10 +57,11 @@ flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_bool('VAE', True, 'VAE training')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
 flags.DEFINE_integer('batch_runs', 1, 'Number of times give the same input to VAE')
-flags.DEFINE_integer('num_saves', 10, 'number of outputs to save')
-flags.DEFINE_integer('test_ckpt', None, 'checkpoint to test')
+flags.DEFINE_integer('num_saves', 5, 'number of outputs to save')
+flags.DEFINE_integer('test_ckpt', 180, 'checkpoint to test')
 flags.DEFINE_string('fmt', 'mann', 'data format')
 flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
+flags.DEFINE_integer('pretrained_ckpt', None, 'Number of epochs to checkpoint of pretrained model')
 
 pss = lambda a, b: a == b
 
@@ -87,7 +88,7 @@ def main(arg):
     test_dataset = HagglingDataset(FLAGS.test, FLAGS)
     test_dataloader = DataLoader(test_dataset, batch_size=FLAGS.batch_size, num_workers=10)
 
-    ckpt = FLAGS.ckpt + FLAGS.model
+    ckpt = FLAGS.ckpt_dir + FLAGS.model
 
     model = get_model()
     model.load_model(ckpt, FLAGS.test_ckpt)
