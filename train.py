@@ -43,7 +43,7 @@ flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
 flags.DEFINE_integer('gat_hidden_units', 256, 'Gating network hidden units')
 flags.DEFINE_integer('enc_layers', 3, 'encoder layers')
 flags.DEFINE_integer('dec_layers', 1, 'decoder layers')
-flags.DEFINE_integer('num_experts', 8, 'number of experts in  decoder')
+flags.DEFINE_integer('num_experts', 3, 'number of experts in  decoder')
 flags.DEFINE_float('enc_dropout', 0.25, 'encoder dropout')
 flags.DEFINE_float('dec_dropout', 0.25, 'decoder dropout')
 flags.DEFINE_float('gat_dropout', 0.25, 'gating network dropout')
@@ -57,7 +57,7 @@ flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to laten
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
 flags.DEFINE_float('lmd3', 0.2, 'Regularization factor for velocity predcition')
-flags.DEFINE_bool('skip_train_metrics', True, 'skip calculation of train metrics')
+flags.DEFINE_bool('skip_train_metrics', False, 'skip calculation of train metrics')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
@@ -180,7 +180,7 @@ def main(args):
     if FLAGS.resume_train:
         ckpt = os.path.join(FLAGS.ckpt_dir, FLAGS.model + '/')
         starting_epoch = model.load_model(ckpt, None)
-        starting_epoch = 90
+        #starting_epoch = 130
 
     # get the loss function and optimizers
     criterion = get_loss_fn()

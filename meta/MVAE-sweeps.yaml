@@ -27,7 +27,7 @@ parameters:
   num_experts:
     values: [ 3, 6, 8, 12]
   c_dim:
-    value: 2
+    value: 0
   lmd2:
     distribution: log_uniform
     min: -16

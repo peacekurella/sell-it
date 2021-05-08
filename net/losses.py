@@ -124,8 +124,7 @@ def sequential_reconstruction_VAE(predictions, target, model_params, FLAGS):
     loss_kld = torch.mean(torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=2), dim=1), dim=0)
 
     # add motion regularization
-    loss_vel = criterion3(pose_pred[:, :, 69:132], target['pose'][:, :, 69:132]) + criterion3(pose_pred[:, :, :2],
-                                                                                              target['pose'][:, :, :2])
+   loss_vel = criterion3(pose_pred[:, :, 69:132], target['pose'][:, :, 69:132]) + criterion3(pose_pred[:, :, :2], target['pose'][:, :, :2])
 
     if FLAGS.speak:
         criterion2 = nn.BCEWithLogitsLoss(reduction='mean')
