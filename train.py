@@ -56,6 +56,7 @@ flags.DEFINE_float('end_scheduled_sampling', 0.4, 'when to stop scheduled sampli
 flags.DEFINE_integer('c_dim', 0, 'number of conditional variables added to latent dimension')
 flags.DEFINE_bool('speak', True, 'speak classification required')
 flags.DEFINE_float('lmd2', 0.2, 'Regularization factor for speaking predcition')
+flags.DEFINE_float('lmd3', 0.2, 'Regularization factor for velocity predcition')
 flags.DEFINE_bool('skip_train_metrics', True, 'skip calculation of train metrics')
 
 flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
