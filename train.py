@@ -33,15 +33,15 @@ flags.DEFINE_string('ckpt_dir', 'ckpt/', 'Directory to store checkpoints')
 flags.DEFINE_string('frechet_ckpt', 'ckpt/Frechet/', 'file containing the model weights')
 flags.DEFINE_string('output_dir', 'Data/MVAEoutput/', 'Folder to store final videos')
 
-flags.DEFINE_integer('batch_size', 128, 'Training set mini batch size')
-flags.DEFINE_integer('epochs', 200, 'Training epochs')
-flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate')
-flags.DEFINE_float('lmd', 0.1, 'Regularization factor')
+flags.DEFINE_integer('batch_size', 48, 'Training set mini batch size')
+flags.DEFINE_integer('epochs', 400, 'Training epochs')
+flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate')
+flags.DEFINE_float('lmd', 0.2, 'Regularization factor')
 flags.DEFINE_string('optimizer', 'Adam', 'type of optimizer')
 flags.DEFINE_integer('enc_hidden_units', 256, 'Encoder hidden units')
 flags.DEFINE_integer('dec_hidden_units', 256, 'Decoder hidden units')
 flags.DEFINE_integer('gat_hidden_units', 256, 'Gating network hidden units')
-flags.DEFINE_integer('enc_layers', 1, 'encoder layers')
+flags.DEFINE_integer('enc_layers', 3, 'encoder layers')
 flags.DEFINE_integer('dec_layers', 1, 'decoder layers')
 flags.DEFINE_integer('num_experts', 8, 'number of experts in  decoder')
 flags.DEFINE_float('enc_dropout', 0.25, 'encoder dropout')
@@ -62,10 +62,10 @@ flags.DEFINE_integer('input_dim', 244, 'input pose vector dimension')
 flags.DEFINE_integer('output_dim', 244, 'output pose vector dimension')
 flags.DEFINE_bool('pretrain', True, 'pretrain the auto encoder')
 flags.DEFINE_bool('resume_train', False, 'Resume training the model')
-flags.DEFINE_string('model', "LMTVAE", 'Defines the name of the model')
+flags.DEFINE_string('model', "MVAE", 'Defines the name of the model')
 flags.DEFINE_bool('CNN', False, 'Cnn based model')
 flags.DEFINE_string('pretrainedModel', 'bodyAE', 'path to pretrained weights')
-flags.DEFINE_integer('ckpt', 1, 'Number of epochs to checkpoint')
+flags.DEFINE_integer('ckpt', 10, 'Number of epochs to checkpoint')
 flags.DEFINE_integer('pretrained_ckpt', None, 'Number of epochs to checkpoint of pretrained model')
 flags.DEFINE_string('device', 'cuda:0', 'Device to train on')
 flags.DEFINE_integer('num_saves', 0, 'number of output videos to save')
@@ -198,7 +198,8 @@ def main(args):
             'Train/Total_Loss': 0,
             'Train/Reconstruction_Loss': 0,
             'Train/Regularization_Loss': 0,
-            'Train/CrossEntropy_Loss': 0
+            'Train/CrossEntropy_Loss': 0,
+            'Train/VelocityRegularization': 0
         }
 
         train_metric_logs = {

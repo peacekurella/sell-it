@@ -134,6 +134,7 @@ def sequential_reconstruction_VAE(predictions, target, model_params, FLAGS):
         'Regularization_Loss': loss_kld,
         'CrossEntropy_Loss': CrossEntropy_Loss,
         'Reconstruction_Loss': Reconstruction_Loss,
+        'VelocityRegularization': loss_vel
     }
 
     return losses
