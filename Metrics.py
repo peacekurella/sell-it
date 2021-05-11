@@ -133,6 +133,18 @@ class Metrics():
 
         return acc
 
+    def get_speech_data(self, predictions, batch):
+
+        batch_size = batch['buyer']['joints21'].shape[0]
+        prediction_subjects = []
+        target_subjects = []
+        prediction_subjects.append(
+            (predictions['speech'][:batch_size].cpu().numpy(),
+             predictions['speech'][batch_size:].cpu().numpy()))
+        target_subjects.append((batch['rightSeller']['speakingStatus'].cpu().numpy(),
+                                batch['leftSeller']['speakingStatus'].cpu().numpy()))
+        return prediction_subjects, target_subjects
+
     def get_global_positions(self, subjects):
         """
             denormalize and globalize positions of humans
@@ -187,12 +199,6 @@ class Metrics():
             (buyer.copy(), initRotBuyer, initTransBuyer)
         ]
 
-        # if 'speech' in predictions:
-        #     prediction_subjects.append(
-        #         (predictions['speech'][:batch_size].cpu().numpy(), predictions['speech'][batch_size:].cpu().numpy()))
-        #     target_subjects.append((batch['rightSeller']['speakingStatus'].cpu().numpy(),
-        #                             batch['leftSeller']['speakingStatus'].cpu().numpy()))
-
         return prediction_subjects, target_subjects
 
     def save_files(self, prediction, targets, role, i_batch, test_num, idx):
@@ -215,31 +221,32 @@ class Metrics():
         del vis
 
     def compute_and_save(self, predictions, targets, batch, i_batch, test_num):
-        predictions, targets = self.split_into_subjects(predictions['pose'], targets['pose'], batch)
+        prediction, targets = self.split_into_subjects(predictions['pose'], targets['pose'], batch)
 
-        predictions = self.get_global_positions(predictions)
+        prediction = self.get_global_positions(prediction)
         targets = self.get_global_positions(targets)
 
         metrics = {
-            "RightMSE": Metrics.get_mse_loss(predictions[0], targets[0][:, :predictions[0].shape[1]]).cpu().numpy().item(),
-            "LeftMSE": Metrics.get_mse_loss(predictions[1], targets[1][:, :predictions[1].shape[1]]).cpu().numpy().item(),
+            "RightMSE": Metrics.get_mse_loss(prediction[0], targets[0][:, :prediction[0].shape[1]]).cpu().numpy().item(),
+            "LeftMSE": Metrics.get_mse_loss(prediction[1], targets[1][:, :prediction[1].shape[1]]).cpu().numpy().item(),
 
-            "RightNPSS": Metrics.get_npss_score(predictions[0], targets[0][:, :predictions[0].shape[1]]),
-            "LeftNPSS": Metrics.get_npss_score(predictions[1], targets[1][:, :predictions[1].shape[1]]),
+            "RightNPSS": Metrics.get_npss_score(prediction[0], targets[0][:, :prediction[0].shape[1]]),
+            "LeftNPSS": Metrics.get_npss_score(prediction[1], targets[1][:, :prediction[1].shape[1]]),
 
-            "RightFrechet": Metrics.get_frechet_distance(self, predictions[0], targets[0][:, :predictions[0].shape[1]]),
-            "LeftFrechet": Metrics.get_frechet_distance(self, predictions[1], targets[1][:, :predictions[1].shape[1]])
+            "RightFrechet": Metrics.get_frechet_distance(self, prediction[0], targets[0][:, :prediction[0].shape[1]]),
+            "LeftFrechet": Metrics.get_frechet_distance(self, prediction[1], targets[1][:, :prediction[1].shape[1]])
         }
-        if len(predictions) == 4:
-            metrics['RightSpeech'] = self.get_speech_accuracy(predictions[3][0], targets[3][0])
-            metrics['LeftSpeech'] = self.get_speech_accuracy(predictions[3][1], targets[3][1])
+        if 'speech' in predictions.keys():
+            pred, tar = self.get_speech_data(predictions, batch)
+            metrics['RightSpeech'] = self.get_speech_accuracy(pred[0][0], tar[0][0])
+            metrics['LeftSpeech'] = self.get_speech_accuracy(pred[0][1], tar[0][1])
             metrics['Speech'] = (metrics['RightSpeech'] + metrics['LeftSpeech']) / 2
 
-        idxs = random.sample(range(predictions[0].shape[0]), self.num_saves)
+        idxs = random.sample(range(prediction[0].shape[0]), self.num_saves)
 
         for i in idxs:
-            self.save_files(predictions[0], targets, 'right', i_batch, test_num, i)
-            self.save_files(predictions[1], targets, 'left', i_batch, test_num, i)
+            self.save_files(prediction[0], targets, 'right', i_batch, test_num, i)
+            self.save_files(prediction[1], targets, 'left', i_batch, test_num, i)
 
         metrics['MSE'] = (metrics['RightMSE'] + metrics['LeftMSE']) / 2
         metrics['NPSS'] = (metrics['RightNPSS'] + metrics['LeftNPSS']) / 2
